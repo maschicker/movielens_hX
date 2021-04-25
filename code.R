@@ -67,24 +67,23 @@ rm(dl, ratings, movies, test_index, temp, movielens, removed)
 #######PRE-PROCESSING DATA########
 
 #small data_excerpt to try code fast
-edx_try <- edx[1:1000]
-
+try_index <- createDataPartition(y = edx$rating, times = 1, p = 0.001, list = FALSE)
+edx_try <- edx[try_index,]
+dim(edx_try)
 ### data exploration
 summary(edx)
 str(edx)
-names(edx)
 edx_desc <- describe(edx)
 
 # mutate data (REMOVE NA´S, rating as.factor, convert timestamp 
-edx_clean <- edx_try %>% 
-  mutate(rating = ifelse(is.na(rating), median(rating, na.rm = TRUE), rating),
-         #rating = as.factor(rating),#convert to factors
-         timestamp = as_datetime(timestamp)# convert timestamp to a date_time object
-  )
+#edx_clean <- edx_try %>% 
+#mutate(rating = ifelse(is.na(rating), median(rating, na.rm = TRUE), rating),
+#         timestamp = as_datetime(timestamp)# convert timestamp to a date_time object
+#  )
 
 
 #look for duplicate entries
-problems <- which(duplicated(edx_clean))
+problems <- which(duplicated(edx_try))
 problems
 
 
@@ -103,37 +102,63 @@ sapply(genres, function(g) {
   sum(str_detect(edx$genres, g))
 })
 
-edx_visual <- edx_clean %>% mutate(
-                year = as.numeric(year(timestamp)),
-                month = as.numeric(month(timestamp)),
-                day = wday(timestamp, label = TRUE, abbr = TRUE))
+edx_visual <- edx_try %>% mutate(
+  year = year(as_datetime(timestamp)),
+  month = month(as_datetime(timestamp), label=TRUE),
+  day = wday(as_datetime(timestamp), label = TRUE))
+
 
 ##histogram rating
-qplot(edx_visual$rating)
-mean(edx_visual$rating)
+edx_visual %>% ggplot(aes(rating))+
+  geom_histogram(binwidth = 0.5)
 
+r<- mean(edx_visual$rating)
 
+##avg rating by year
 edx_visual %>%
   group_by(year)%>%
   summarize(avg_rating = mean(rating))%>%
-  ggplot(aes(rating))+
-  geom_histogram()
+  ggplot(aes(x=year, y=avg_rating))+
+  geom_point()+
+  geom_line()
+
+##boxplot ratings by year
+edx_visual %>%
+  ggplot(aes(x=year, y=rating, group=year))+
+  geom_boxplot()+
+ # geom_jitter(shape=21, alpha=0.5)+
+  stat_summary(fun=mean, geom="point", shape=15, size=4, col=2)+
+  coord_flip()
+
+
+##boxplot ratings by month
+edx_visual %>%
+  ggplot(aes(x=month, y=rating, group=month))+
+  geom_boxplot()+
+  # geom_jitter(shape=21, alpha=0.5)+
+  stat_summary(fun=mean, geom="point", shape=15, size=4, col=2)+
+  coord_flip()
+
     
-##AVG Rating
-  ##by genre
-  ##by timestamp
+##boxplot ratings by weekday
+edx_visual %>%
+  ggplot(aes(x=day, y=rating, group=day))+
+  geom_boxplot()+
+  #geom_jitter(shape=21, alpha=0.5)+
+  stat_summary(fun=mean, geom="point", shape=15, size=4, col=2)+
+  coord_flip()
+
+
+
+
 
   ##by genre
-  ##by timestamp
 
 
 ##### standardizing predictors
 
 
 ##### log-transform???
-
-
-##### removing highly correlated predictors
 
 
 ##### removing predictors with non-unique values or zero-variation
@@ -150,14 +175,17 @@ RMSE <- function(true_ratings, predicted_ratings){
   sqrt(mean((true_ratings - predicted_ratings)^2))
 }
 
+
 ####CREATING TRAINING AND TEST SET#####
 
 set.seed(1, sample.kind="Rounding")
 test_index <- createDataPartition(y = edx_try$rating, times = 1, p = 0.1, list = FALSE)
-edx_train <- edx_clean[-test_index,]
-edx_test <- edx_clean[test_index,]
+edx_train <- edx_try[-test_index,]
+edx_test <- edx_try[test_index,]
 
-
+edx_test <- edx_test %>% 
+  semi_join(edx_train, by = "movieId") %>%
+  semi_join(edx_train, by = "userId")
 
 ####MODEL 1 - AVERAGE####
 mu_hat <- mean(edx_train$rating)
@@ -171,33 +199,102 @@ naive_rmse
 rmse_results <- data_frame(method = "Average", RMSE = naive_rmse)
 rmse_results %>% knitr::kable()
 
-####MODEL 2 - LM####
 
 
-model2_predict <- 
 
-model_2_rmse <- RMSE(edx_test$rating, model2_predict)
+
+####MODEL 2.1 - LM with movieId####
+mu <- mean(edx_train$rating) 
+movie_avgs <- edx_train %>% 
+  group_by(movieId) %>% 
+  summarize(b_i = mean(rating - mu))
+
+movie_avgs %>% qplot(b_i, geom ="histogram", bins = 10, data = ., color = I("black"))
+
+predicted_ratings <- mu + edx_test %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  .$b_i
+
+predicted_ratings <- ifelse(!is.na(predicted_ratings),predicted_ratings, mu)
+predicted_ratings
+
+model_2.1_rmse <- RMSE(edx_test$rating, predicted_ratings)
 
 rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="Model 2",
-                                     RMSE = model_2_rmse ))
-####MODEL 3 - knn####
+                          data_frame(method="linear movieId",
+                                     RMSE = model_2.1_rmse ))
+rmse_results %>% knitr::kable()
 
-train_knn <- train(rating ~ ., method = "knn", 
+####MODEL 2.2 - LM with userId + movieId####
+edx_train %>% 
+  group_by(userId) %>% 
+  summarize(b_u = mean(rating)) %>% 
+  filter(n()>=10) %>%
+  ggplot(aes(b_u)) + 
+  geom_histogram(bins = 10, color = "black")
+
+
+user_avgs <- edx_test %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  group_by(userId) %>%
+  summarize(b_u = mean(rating - mu - b_i)) 
+
+predicted_ratings <- edx_test %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  left_join(user_avgs, by='userId') %>%
+  mutate(pred = mu + b_i + b_u) %>%
+  .$pred
+
+predicted_ratings <- ifelse(!is.na(predicted_ratings),predicted_ratings, mu+b_i)
+#predicted_ratings <- round(predicted_ratings*2,1)/2 #round the result to the closest 0.5-step
+
+
+model_2.2_rmse <- RMSE(edx_test$rating, predicted_ratings)
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="linear movieId + userId",
+                                     RMSE = model_2.2_rmse ))
+rmse_results %>% knitr::kable()
+
+####MODEL 2.3 - LM with userId + movieId + timestamp
+
+#define category for genre combination and keep only cat w/>n=1000. plot error bar. which genre has lowest average rating
+edx_train %>% group_by(genres) %>%
+  summarize(n = n(), avg = mean(rating), se = sd(rating)/sqrt(n())) %>%
+  filter(n >= 100) %>% #increase to 1000 when working with complete data set
+  mutate(genres = reorder(genres, avg)) %>%
+  ggplot(aes(x = genres, y = avg, ymin = avg - 2*se, ymax = avg + 2*se)) + 
+  geom_point() +
+  geom_errorbar() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+
+
+
+
+####MODEL 3.1 - knn####
+
+train_knn <- train(rating ~ userId+movieId+as_datetime(timestamp), method = "knn", 
                    data = edx_train,
-                   tuneGrid = data.frame(k = seq(9, 71, 2)))
+                   tuneGrid = data.frame(k = seq(5, 41, 2)))
 ggplot(train_knn, highlight = TRUE)
 train_knn$bestTune
 train_knn$finalModel
-model3_predict <- predict(train_knn, edx_test, type = "raw")
-confusionMatrix(model3_predict, edx_test$rating)$overall["RMSE"]
+min(train_knn$results$RMSE)
+model3.1_predict <- predict(train_knn, edx_test, type = "raw")
+model_3.1_rmse <- RMSE(edx_test$rating, model3.1_predict)
 
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="knn",
+                                     RMSE = model_3_rmse))
 
-###cross-validation
+rmse_results %>% knitr::kable()
+####MODEL 3.2 - knn-cross-validation####
 control <- trainControl(method = "cv", number = 10, p = .9)
-train_knn_cv <- train(rating ~ ., method = "knn", 
+train_knn_cv <- train(rating ~ userId+movieId+as_datetime(timestamp), method = "knn", 
                       data = edx_train,
-                      tuneGrid = data.frame(k = seq(9, 71, 2)),
+                      tuneGrid = data.frame(k = seq(5, 41, 2)),
                       trControl = control)
 ggplot(train_knn_cv, highlight = TRUE)
 
@@ -205,20 +302,18 @@ train_knn$results %>%
   ggplot(aes(x = k, y = RMSE)) +
   geom_line() +
   geom_point() +
-  geom_errorbar(aes(x = k, 
-                    ymin = Accuracy - AccuracySD,
-                    ymax = Accuracy + AccuracySD))
-
-model_3_rmse <- RMSE(edx_test$rating, model3_predict)
+  
+model3.2_predict <- predict(train_knn_cv, edx_test, type = "raw")
+model_3.2_rmse <- RMSE(edx_test$rating, model3.2_predict)
 
 rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="Model 3",
-                                     RMSE = model_3_rmse ))
+                          data_frame(method="knn_CV",
+                                     RMSE = model_3.2_rmse))
 
 
 ####MODEL 4 - DT ####
 set.seed(1, sample.kind = "Rounding")
-train_dt <- train(rating ~., 
+train_dt <- train(rating ~userId+movieId+, 
                   method = "rpart", 
                   tuneGrid = data.frame(cp = seq(0, 0.05, 0.002)),
                   metric="RMSE",
@@ -268,7 +363,7 @@ rmse_results <- bind_rows(rmse_results,
 
 #########VALIDATE BEST MODEL#########
 
-predict_final <- 
+predict_final <- predict(_INSERT MODEL HERE_, validation, type = "raw")
 
 validation_rmse <- RMSE(validation$rating, predict_final)
-confusionMatrix(predict_final, validation$rating)#$overall["RMSE"]
+validation_rmse
