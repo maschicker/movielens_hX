@@ -1,0 +1,121 @@
+---
+title: "HarvardX - Data Science"
+author: "Marco Schicker"
+date: "2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+## Executive summary
+
+The goal of this project is to predict movie ratings with a low RMSE.
+The means to do so are analyzing a data set provided and training a model to make predictions for a validation set of data. 
+
+the edx-data set provided consists of 9000055 movie ratings. Each rating is categorized by the following variables:
+* userID - a unique identifier per user
+* movieID - a unique identifier per movie
+* Title - The movie title, including the release year of the movie
+* timestamp - The date and time when the movie was rated by the user
+* genres - a list of genres to categorize movies
+
+In general the steps performed to fulfill the task are:
+* importing data
+* cleaning data
+* exploring and visualizing data
+* training different models and comparing performance
+* validating the most promising model on the validation set
+
+In the end a Model was found with a RMSE of XYZ
+
+
+
+
+
+## Methods & Analysis
+The process to train the algorithm consists of the following basic steps:
+* data import
+* data cleaning
+* data exploration and visualization
+* creating training and test set
+* 
+
+### data import
+The data used to train the model is derived from the publicly available movielens database. According to provided code a data set "edx" and a dataset "validation" is automatically created. 
+The "edx"-data set is used to train a model, while the second data set "validation" is used to validate the chosen model. 
+
+
+### data cleaning
+In order to work with the dataset it is analyzed and changed.
+
+* find predictors that are highly correlated and remove if necessary
+``` 
+corrplot(cor(d), method = "number")
+```
+* remove predictors with near zero variation
+```
+List of NZ-predictors and values of STD-deviation
+```
+
+
+### data exploration and visualization
+looking at the predictor´s influence on the rating we can see that...
+```
+grid Y=rating, X=predictors
+```
+
+
+some data about single predictors
+* histogram
+
+### insights gained
+We can see from the analyzed data that 
+
+### modeling approach
+#### identify predictors
+#### identify prediction model
+
+## Results
+Following the approach mentioned above we can see that we reach the best result by combining the predictor set X (a, b, c, d) with the prediction method Y (ensemble)
+```
+matrix predictor sets vs prediction method
+````
+
+
+### comparison of model performance
+
+
+## Conclusion
+To sum up the results of this report it was possible to train an algorithm and reach an _RMSE of _.
+The best performance was reached by using the following predictors:
+* 
+* 
+*
+
+The best results were reached using an ensemble of the following prediction methods:
+* naivebayes
+* knn
+* random forest
+* ...
+
+The limitations of this report lie in...
+Next steps to improve performance even more would be to increase training data size, keep on learning or use neural networks to find new predictors in deep learning algorithms.
+Use other predictors like actors, country of origin, languages available,...
+One could also analyze for trigger words within the title and check if there are correlations with ratings if the title contains words like "Love", "reloaded", "fight" or others.
+
+
