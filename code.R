@@ -84,7 +84,7 @@ edx_desc
 edx_try <- edx_try %>% 
   mutate(rel_year = str_extract(title, "(\\d{4})"), # create rel_year base on the title-entry
          rel_year = as.numeric(str_replace_all(rel_year,"(|)", "")), # remove parantheses and convert to number
-         rel_year = ifelse(rel_year>2020, 1994, ifelse(rel_year < 1900, 1994,rel_year) ),
+         rel_year = ifelse(rel_year>2010, 1994, ifelse(rel_year < 1900, 1994,rel_year)),
          ts_year = year(as_datetime(timestamp)),
          ts_month = month(as_datetime(timestamp), label = FALSE),
          ts_day = wday(as_datetime(timestamp), label = FALSE)
@@ -94,6 +94,7 @@ validation <- validation %>%
   mutate(rel_year = str_extract(title, "(\\d{4})"),
          rel_year = as.numeric(str_replace_all(rel_year,"(|)", "")),
          ts_year = year(as_datetime(timestamp)),
+         rel_year = ifelse(rel_year>2010, 1994, ifelse(rel_year < 1900, 1994,rel_year)),
          ts_month = month(as_datetime(timestamp), label = FALSE),
          ts_day = wday(as_datetime(timestamp), label = FALSE)
          )
@@ -131,17 +132,40 @@ edx_try %>% ggplot(aes(rating))+
 r<- mean(edx_try$rating)
 
 
-##histograms by filter ()
+##count(ratings) per ts_year
+
+edx_try %>%
+  group_by(ts_year)%>%
+  summarize (n()) %>%
+  plot()
 
 
 
-##avg rating by year
+##avg rating by ts_year
 edx_try %>%
   group_by(ts_year)%>%
   summarize(avg_rating = mean(rating))%>%
   ggplot(aes(x=ts_year, y=avg_rating))+
   geom_point()+
   geom_line()
+
+
+##avg rating by ts_month
+edx_try %>%
+  group_by(ts_month)%>%
+  summarize(avg_rating = mean(rating))%>%
+  ggplot(aes(x=ts_month, y=avg_rating))+
+  geom_point()+
+  geom_line()
+
+#avg rating by ts_day
+edx_try %>%
+  group_by(ts_day)%>%
+  summarize(avg_rating = mean(rating))%>%
+  ggplot(aes(x=ts_day, y=avg_rating))+
+  geom_point()+
+  geom_line()
+
 
 ##boxplot ratings by year
 edx_try %>%
