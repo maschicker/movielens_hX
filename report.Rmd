@@ -13,15 +13,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r cars}
 summary(cars)
 ```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
 ## Executive summary
 
 The goal of this project is to predict movie ratings with a low RMSE.
@@ -30,7 +21,7 @@ The means to do so are analyzing a data set provided and training a model to mak
 the edx-data set provided consists of 9000055 movie ratings. Each rating is categorized by the following variables:
 * userID - a unique identifier per user
 * movieID - a unique identifier per movie
-* Title - The movie title, including the release year of the movie
+* title - The movie title, including the release year of the movie
 * timestamp - The date and time when the movie was rated by the user
 * genres - a list of genres to categorize movies
 
@@ -48,10 +39,11 @@ In the end a Model was found with a RMSE of XYZ
 
 
 ## Methods & Analysis
-The process to train the algorithm consists of the following basic steps:
+The process to train the models consists of the following basic steps:
 * data import
 * data cleaning
 * data exploration and visualization
+* data mutation
 * creating training and test set
 * 
 
@@ -61,33 +53,67 @@ The "edx"-data set is used to train a model, while the second data set "validati
 
 
 ### data cleaning
-In order to work with the dataset it is analyzed and changed.
+In order to work with the data set it is analyzed and changed.
 
-* find predictors that are highly correlated and remove if necessary
-``` 
+#### Find duplicate entries
+
+No duplicate entries could be found.
+
+#### Find predictors that are highly correlated and remove if necessary
+``` {r d}
 corrplot(cor(d), method = "number")
 ```
-* remove predictors with near zero variation
-```
+As the correlation matrix shows there are no highly correlated numeric variables that should be excluded from the analysis. The movieId and the timestamp have a slight correlation which shows, that most ratings happen after and rather close to the release date of a movie. However, movieId and title are highly correlated, as every movie has it´s fixed title. Since we cannot rule out misspelling we will exclude the title and only go with movieId as a predictor. The movieId in the edx data set includes the release year of the movie which holds additional information. In order to use that data we will extract the movie release year and create a new column "rel_year"
+
+Looking at the newly extracted release year we find some wrong entries, as low as 1138 and as high as 3000. These values will be substituted by the median of release years (1994).
+
+#### Remove predictors with near zero variation
+```{r }
 List of NZ-predictors and values of STD-deviation
 ```
+As the standard deviation of the numeric variables (timestamp, userId, movieId) show there is no reason to exclude any of the list.
+
+The character-predictors (title and genres) are checked by looking at the amount of individual values.
+```
+ndistinct(edx$title)
+ndistinct(edx$genres)
+```
+
+### Data exploration and visualization
+
+A first glance at the data shows the distribution of ratings with an average rating overall of _XYZ_
+```
+edx_visual %>% ggplot(aes(rating))+
+  geom_histogram(binwidth = 0.5)
+```
 
 
-### data exploration and visualization
-looking at the predictor´s influence on the rating we can see that...
+Looking at the predictor´s influence on the rating we can see that...
 ```
 grid Y=rating, X=predictors
 ```
 
 
-some data about single predictors
-* histogram
+#### Boxplots for single predictors
+
+
 
 ### insights gained
 We can see from the analyzed data that 
 
+
+
 ### modeling approach
 #### identify predictors
+
+In the dataset we have 5 possible predictors
+* userId
+* movieId
+* timestamp
+* title
+* genres
+
+As we could see from the boxplots above 
 #### identify prediction model
 
 ## Results
@@ -114,8 +140,8 @@ The best results were reached using an ensemble of the following prediction meth
 * ...
 
 The limitations of this report lie in...
-Next steps to improve performance even more would be to increase training data size, keep on learning or use neural networks to find new predictors in deep learning algorithms.
-Use other predictors like actors, country of origin, languages available,...
+Next steps to improve performance even more would be to use other predictors like director, actors, country of origin, languages available, production cost, movie length, amount of awards, and more...
 One could also analyze for trigger words within the title and check if there are correlations with ratings if the title contains words like "Love", "reloaded", "fight" or others.
+Another way would also be to increase training data size, or use neural networks to find new predictors in deep learning algorithms.In order to do soe we would need to provide a broader data base.
 
 
