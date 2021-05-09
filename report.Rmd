@@ -5,20 +5,17 @@ date: "2021"
 output: pdf_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, require-libraries, eval=T, echo=F, message=F, warning=F}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-```{r cars}
-summary(cars)
-```
 ## Executive summary
 
-The goal of this project is to predict movie ratings with a low RMSE.
+The goal of this project is to predict movie ratings based on a set of predictors. The target is to create a model which predictions minimize the deviations compared with the true rating, i.e. a low root mean square deviation (RMSE).
 The means to do so are analyzing a data set provided and training a model to make predictions for a validation set of data. 
 
-the edx-data set provided consists of 9000055 movie ratings. Each rating is categorized by the following variables:
+The edx-data set provided consists of 9000055 movie ratings. Each rating is categorized by the following variables:
 * userID - a unique identifier per user
 * movieID - a unique identifier per movie
 * title - The movie title, including the release year of the movie
@@ -32,40 +29,43 @@ In general the steps performed to fulfill the task are:
 * training different models and comparing performance
 * validating the most promising model on the validation set
 
-In the end a Model was found with a RMSE of XYZ
-
-
-
+In the end a Model was found with a RMSE of ``` {r, echo=false } final_model_rmse <- RMSE(validation$rating, final_predict)``` running on the validation data set. 
 
 
 ## Methods & Analysis
 The process to train the models consists of the following basic steps:
 * data import
-* data cleaning
-* data exploration and visualization
+* data exploration, cleaning and visualization
 * data mutation
 * creating training and test set
-* 
+* training and comparing different models
+* validation of best model
 
 ### data import
 The data used to train the model is derived from the publicly available movielens database. According to provided code a data set "edx" and a dataset "validation" is automatically created. 
 The "edx"-data set is used to train a model, while the second data set "validation" is used to validate the chosen model. 
 
 
-### data cleaning
-In order to work with the data set it is analyzed and changed.
+### data exploration, cleaning and visualization
+
+In order to work with the data set it is analyzed and altered
+#### Overall analysis
+To get a first overview about the data the following table is created:
+```{r edx, echo=false}
+summary(edx)
+```
+We can see that the data
 
 #### Find duplicate entries
 
 No duplicate entries could be found.
 
 #### Find predictors that are highly correlated and remove if necessary
-``` {r d}
+``` {r d, echo = FALSE}
 corrplot(cor(d), method = "number")
 ```
-As the correlation matrix shows there are no highly correlated numeric variables that should be excluded from the analysis. The movieId and the timestamp have a slight correlation which shows, that most ratings happen after and rather close to the release date of a movie. However, movieId and title are highly correlated, as every movie has it´s fixed title. Since we cannot rule out misspelling we will exclude the title and only go with movieId as a predictor. The movieId in the edx data set includes the release year of the movie which holds additional information. In order to use that data we will extract the movie release year and create a new column "rel_year"
+As the correlation matrix shows there are only few correlated numeric variables that should be excluded from the analysis. ts_year is highly correlated with timestamp because it is directly derived from the timestamp. That means we can work with only one of the two. To speed up data handling the timestamp will be dropped from the edx and validation dataset. The movieId and the timestamp have a slight correlation which shows, that most ratings happen after and rather close to the release date of a movie. However, movieId and title are highly correlated, as every movie has it´s fixed title. Since we cannot rule out misspelling we will exclude the title and only go with movieId as a predictor. Title will be kept in the data set for check purposes before regularization. The movieId in the edx data set includes the release year of the movie which holds additional information. In order to use that data we will extract the movie release year and create a new column "rel_year"
 
-Looking at the newly extracted release year we find some wrong entries, as low as 1138 and as high as 3000. These values will be substituted by the median of release years (1994).
 
 #### Remove predictors with near zero variation
 ```{r }
@@ -78,48 +78,74 @@ The character-predictors (title and genres) are checked by looking at the amount
 ndistinct(edx$title)
 ndistinct(edx$genres)
 ```
+It shows that they have enough distinct entries to keep them in the datas set.
 
-### Data exploration and visualization
 
-A first glance at the data shows the distribution of ratings with an average rating overall of _XYZ_
-```
+#### Average and distribution
+A first glance at the data shows the distribution of ratings with an average rating overall of '''{r echo=false} mean(edx$rating)'''
+```{r echo = false}
 edx_visual %>% ggplot(aes(rating))+
   geom_histogram(binwidth = 0.5)
 ```
 
 
-Looking at the predictor´s influence on the rating we can see that...
-```
-grid Y=rating, X=predictors
-```
 
-
-#### Boxplots for single predictors
+#### Smoothplots for single predictors
 
 
 
-### insights gained
-We can see from the analyzed data that 
+### Insights gained
+We can see from the analyzed data that we have hardly any change of rating looking at the predictors
+* ts_month
+* ts_day
+As a consequence these two variables will be dumped from the edx and validation data set.
+
+To create the models we will use the five remaining predictors
+1. userId
+2. movieId
+3. genres
+4. rel_year (release year of the movie)
+5. ts_year (year of the rating)
 
 
 
 ### modeling approach
-#### identify predictors
 
-In the dataset we have 5 possible predictors
-* userId
-* movieId
-* timestamp
-* title
-* genres
 
-As we could see from the boxplots above 
-#### identify prediction model
+We will use the predictors as described in the prior chapter. 
+
+#### List of prediction models
+We will compare various prediction models and combinations of predictors by their performance. They are described by the following code:
+
+Model 1 - Average
+Model 2 - Linear Models
+  Model 2.1 - Models with 1 predictor
+    Model 2.1.1 - movieId
+    Model 2.1.2 - userId
+  Model 2.2 - Models with 2 predictors
+    Model 2.2.1 - movieId + userId
+    Model 2.2.2 - movieId + ts_year
+    Model 2.2.3 - userId + genres
+    Model 2.2.4 - userId + rel_year
+  Model 2.3 - Models with 3 predictors
+    Model 2.3.1 - movieId + userId + genres
+    Model 2.3.2 - movieId + userId + rel_year
+  Model 2.4 - Models with 4 predictors
+    Model 2.4.1 - movieId + userId + genres + rel_year
+    Model 2.4.2 - movieId + userId + genres + ts_year
+  Model 2.5 - Model with 5 predictos 
+  Model 2.6 - Top performing linear model with regularized predictors
+Model 3 - knn
+Model 4 - decision tree
+Model 5 - loess
+Model 6 - random forest
+Model 7 - GLM
+
 
 ## Results
 Following the approach mentioned above we can see that we reach the best result by combining the predictor set X (a, b, c, d) with the prediction method Y (ensemble)
-```
-matrix predictor sets vs prediction method
+```{r echo=false rmse_results %>% knitr::kable()}
+
 ````
 
 
@@ -128,20 +154,13 @@ matrix predictor sets vs prediction method
 
 ## Conclusion
 To sum up the results of this report it was possible to train an algorithm and reach an _RMSE of _.
-The best performance was reached by using the following predictors:
+The best performance was reached by using Model _2.5.2_ with a regularized :
 * 
 * 
 *
 
-The best results were reached using an ensemble of the following prediction methods:
-* naivebayes
-* knn
-* random forest
-* ...
 
-The limitations of this report lie in...
-Next steps to improve performance even more would be to use other predictors like director, actors, country of origin, languages available, production cost, movie length, amount of awards, and more...
+The limitations of this report lie in the limited data used and in the approach chosen, with a limited amount of pre-chosen predictors. Secondly some of the methods couldn´t be used due to a limitation of computing power. 
+Next steps to improve performance would be to use other predictors like director, actors, country of origin, languages available, production cost, movie length, amount of awards, and more...
 One could also analyze for trigger words within the title and check if there are correlations with ratings if the title contains words like "Love", "reloaded", "fight" or others.
-Another way would also be to increase training data size, or use neural networks to find new predictors in deep learning algorithms.In order to do soe we would need to provide a broader data base.
-
-
+Another way would also be to increase training data size, or use neural networks to find new predictors using deep learning algorithms. In order to do so we would need to provide a broader data base.
