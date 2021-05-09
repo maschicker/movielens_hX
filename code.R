@@ -75,7 +75,9 @@ rm(dl, ratings, movies, test_index, temp, movielens, removed)
 
 ### data exploration
 summary(edx)
-
+dim(edx)
+head(edx)
+sapply(edx, class)
 
 # extract release year from title column to create a new predictor for edx and validation
 # extract year, month and day from timestamp
@@ -131,25 +133,34 @@ nzv[,3:4]
 
 ##histogram rating overall
 edx %>% ggplot(aes(rating))+
-  geom_histogram(binwidth = 0.5)
+  geom_histogram(binwidth = 0.5)+
+  labs(title="Ratings overall")
 
 ##histogram rating_year
 edx %>% ggplot(aes(ts_year))+
-  geom_histogram(binwidth = 1)
+  geom_histogram(binwidth = 1)+
+  labs(title="Timestamp Years overall")
 
 ##histogram rating_month
 edx %>% ggplot(aes(ts_month))+
-  geom_histogram(binwidth = 1)
+  geom_histogram(binwidth = 1)+
+  labs(title="Timestamp Months overall")
 
 ##histogram rating_day
 edx %>% ggplot(aes(ts_day))+
-  geom_histogram(binwidth = 1)
-
-
+  geom_histogram(binwidth = 1)+
+  labs(title="Timestamp Weekdays overall")
 
 ##histogram release year movies
 edx %>% ggplot(aes(rel_year))+
-  geom_histogram(binwidth = 1)
+  geom_histogram(binwidth = 1)+
+  labs(title="Release Year overall")
+
+##histogram movieId
+edx %>% ggplot(aes(movieId))+
+  geom_histogram(binwidth = 1)+
+  labs(title="MovieId")+
+  ylim(0,15000)
 
 
 ##plot ratings over timestamp_year (median, avg, se & smoothline)
@@ -164,9 +175,13 @@ edx %>% group_by(ts_year)%>%
   ggplot(aes(x=ts_year, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  geom_errorbar()+
-  geom_smooth()
+  geom_errorbar(aes(alpha=0.3))+
+  geom_smooth()+
+  labs(title="Timestamp Year", y="Rating")+
+  ylim(0,5)
 
+##deep dive ts_year because of non-conclusive data in 1995
+length(which(edx$ts_year==1995))
 
 ##plot ratings over timestamp_month (median, avg, se & smoothline)
 edx %>% group_by(ts_month)%>%
@@ -179,8 +194,10 @@ edx %>% group_by(ts_month)%>%
   ggplot(aes(x=ts_month, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  geom_errorbar()+
-  geom_smooth()
+  geom_errorbar(aes(alpha=0.3))+
+  geom_smooth()+
+  labs(title="Timestamp Month", y="Rating")+
+  ylim(0,5)
 
 ##plot ratings over timestamp_weekday (median, avg, se & smoothline)
 edx %>% group_by(ts_day)%>%
@@ -193,8 +210,15 @@ edx %>% group_by(ts_day)%>%
   ggplot(aes(x=ts_day, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  geom_errorbar()+
-  geom_smooth()
+  geom_errorbar(aes(alpha=0.3))+
+  geom_smooth()+
+  labs(title="Timestamp Day", y="Rating")+
+  ylim(0,5)
+
+##Dropping non-differentiating variables ts_month and ts_day
+edx <- edx[,1:7]
+validation <- validation[,1:7]
+
 
 ##plot ratings over release year of the movie (median, avg, se & smoothline)
 edx %>% group_by(rel_year)%>%
@@ -207,10 +231,12 @@ edx %>% group_by(rel_year)%>%
   ggplot(aes(x=rel_year, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  geom_errorbar()+
-  geom_smooth()
+  geom_errorbar(aes(alpha=0.3))+
+  geom_smooth()+
+  labs(title="Release Year", y="Rating")+
+  ylim(0,5)
 
-##plot ratings over genre w/n>1000 ratings (median, avg, se & smoothline)
+##plot ratings over genre w/n>1000 ratings (median, avg, se)
 edx %>% group_by(genres)%>%
   summarize(
     n=n(),
@@ -218,25 +244,42 @@ edx %>% group_by(genres)%>%
     med=median(rating),
     se= sd(rating)
   )%>%
+  arrange(avg)%>%
   filter(n>1000)%>%
   ggplot(aes(x=genres, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  geom_errorbar()+
-  geom_smooth()
+  geom_errorbar(aes(alpha=0.3))+
+  labs(title="Genres > 1000 occurances", y="Rating", x="")+
+  ylim(0,5)
 
+##plot ratings over movieId (median, avg, se)
+edx %>% group_by(movieId)%>%
+  summarize(
+    n=n(),
+    avg=mean(rating),
+    med=median(rating),
+    se= sd(rating)
+  )%>%
+  ggplot(aes(x=movieId, y=avg, col="avg"))+
+  geom_point()+
+  geom_point(aes(y=med, col="median"))+
+  labs(title="MovieId", y="Rating", x="Movie Id")+
+  ylim(0,5)
 
-
-
-
-##Dropping non-important variables ts_month and ts_day
-edx <- edx[,1:7]
-validation <- validation[,1:7]
-
-##### standardizing predictors
-#not intended in this case - all numeric predictors 
-
-##### log-transform???
+##plot ratings over userId (median, avg, se)
+edx %>% group_by(userId)%>%
+  summarize(
+    n=n(),
+    avg=mean(rating),
+    med=median(rating),
+    se= sd(rating)
+  )%>%
+  ggplot(aes(x=userId, y=avg, col="avg"))+
+  geom_point()+
+  geom_point(aes(y=med, col="median"))+
+  labs(title="UserId", y="Rating", x="User Id")+
+  ylim(0,5)
 
 
 #########MODELING#########
