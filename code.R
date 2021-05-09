@@ -162,6 +162,12 @@ edx %>% ggplot(aes(movieId))+
   labs(title="MovieId")+
   ylim(0,15000)
 
+##histogram userId
+edx %>% ggplot(aes(userId))+
+  geom_histogram(binwidth = 1)+
+  labs(title="UserId")+
+  ylim(0,2500)
+
 
 ##plot ratings over timestamp_year (median, avg, se & smoothline)
 
@@ -253,13 +259,12 @@ edx %>% group_by(genres)%>%
   labs(title="Genres > 1000 occurances", y="Rating", x="")+
   ylim(0,5)
 
-##plot ratings over movieId (median, avg, se)
+##plot ratings over movieId (median, avg)
 edx %>% group_by(movieId)%>%
   summarize(
     n=n(),
     avg=mean(rating),
-    med=median(rating),
-    se= sd(rating)
+    med=median(rating)
   )%>%
   ggplot(aes(x=movieId, y=avg, col="avg"))+
   geom_point()+
@@ -267,13 +272,12 @@ edx %>% group_by(movieId)%>%
   labs(title="MovieId", y="Rating", x="Movie Id")+
   ylim(0,5)
 
-##plot ratings over userId (median, avg, se)
+##plot ratings over userId (median, avg)
 edx %>% group_by(userId)%>%
   summarize(
     n=n(),
     avg=mean(rating),
-    med=median(rating),
-    se= sd(rating)
+    med=median(rating)
   )%>%
   ggplot(aes(x=userId, y=avg, col="avg"))+
   geom_point()+
@@ -306,17 +310,20 @@ RMSE <- function(true_ratings, predicted_ratings){
 mu <- mean(edx_train$rating) 
 mu
 
-#clear results dataframe, if already existing
-rm("rmse_results")
+#set up results dataframe
+rmse_results <- data.frame(method = character(),
+                           RMSE = numeric())
+str(rmse_results)
 
 ####MODEL 1 - AVERAGE####
 avg_rmse <- RMSE(edx_test$rating, mu)
 
 
-# dataframe to compare performance of models#
-rmse_results <- data_frame(method = "Average", RMSE = avg_rmse)
+# add results to dataframe to compare performance of models#
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="1 - Average",
+                                     RMSE = avg_rmse ))
 rmse_results %>% knitr::kable()
-
 
 ####MODEL 2.1.1 - LM with movieId####
 
@@ -363,7 +370,7 @@ rmse_results %>% knitr::kable()
 
 
 
-####MODEL 2.2.1a - LM with movieId + userId####
+####MODEL 2.2.1 - LM with movieId + userId####
 
 set.seed(1, sample.kind = "Rounding")
 
@@ -381,11 +388,11 @@ predicted_ratings <- edx_test %>%
 
 predicted_ratings <- ifelse(!is.na(predicted_ratings),predicted_ratings, mu)
 
-model_2.2.1a_rmse <- RMSE(edx_test$rating, predicted_ratings)
+model_2.2.1_rmse <- RMSE(edx_test$rating, predicted_ratings)
 
 rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="2.2.1a - linear movieId + userId",
-                                     RMSE = model_2.2.1a_rmse ))
+                          data_frame(method="2.2.1 - linear movieId + userId",
+                                     RMSE = model_2.2.1_rmse ))
 rmse_results %>% knitr::kable()
 
 
@@ -509,13 +516,13 @@ rely_avgs <- edx_train %>%
   left_join(movie_avgs, by='movieId') %>%
   left_join(user_avgs, by='userId') %>%
   group_by(rel_year) %>%
-  summarize(b_g = mean(rating - mu - b_i - b_u)) 
+  summarize(b_rely = mean(rating - mu - b_i - b_u)) 
 
 pred_ratings <- edx_test %>% 
   left_join(movie_avgs, by='movieId') %>%
   left_join(user_avgs, by='userId') %>%
   left_join(rely_avgs, by='rel_year')%>%
-  mutate(pred = mu + b_i + b_u + b_g) %>%
+  mutate(pred = mu + b_i + b_u + b_rely) %>%
   .$pred
 
 pred_ratings <- ifelse(!is.na(pred_ratings),pred_ratings, mu+b_i+b_u)
@@ -528,6 +535,33 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results %>% knitr::kable()
 
 
+####MODEL 2.3.3 - LM with userId + movieId + ts_year
+
+gc() #garbage collection to free memory
+
+set.seed(1, sample.kind = "Rounding")
+
+ts_year_avgs <- edx_train %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  left_join(user_avgs, by='userId') %>%
+  group_by(ts_year) %>%
+  summarize(b_tsy = mean(rating - mu - b_i - b_u)) 
+
+pred_ratings <- edx_test %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  left_join(user_avgs, by='userId') %>%
+  left_join(ts_year_avgs, by='ts_year')%>%
+  mutate(pred = mu + b_i + b_u + b_tsy) %>%
+  .$pred
+
+pred_ratings <- ifelse(!is.na(pred_ratings),pred_ratings, mu+b_i+b_u)
+
+model_2.3.3_rmse <- RMSE(edx_test$rating, pred_ratings)
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="2.3.3 - linear movieId + userId + rel_year",
+                                     RMSE = model_2.3.3_rmse ))
+rmse_results %>% knitr::kable()
 
 ####MODEL 2.4.1 - LM with movieId + userId + genre + rel_year
 

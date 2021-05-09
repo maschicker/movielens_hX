@@ -140,6 +140,19 @@ edx %>% ggplot(aes(rel_year))+
   geom_histogram(binwidth = 1)+
   labs(title="Release Year overall")
 
+##histogram movieId
+edx %>% ggplot(aes(movieId))+
+  geom_histogram(binwidth = 1)+
+  labs(title="MovieId")+
+  ylim(0,15000)
+
+##histogram userId
+edx %>% ggplot(aes(userId))+
+  geom_histogram(binwidth = 1)+
+  labs(title="UserId")+
+  ylim(0,2500)
+
+
 ```
 We can see from the histograms that full ratings are much higher in number compared to half-point ratings. Ratings are within a range of 0.5 and 5 points. A rating of 4 has been given more often compared to any other rating and the distribution has a left tail. 
 The histogram of _timestamp_years_ shows that a few years are very low on ratings (1995, 1998, 2009). On the other hand the years 1996, 2000 and 2005 show a very high amount of ratings. This information will be regarded later after more thorough analysis when it comes to regularization.
@@ -150,6 +163,7 @@ The histogram of _timestamp_days_ also shows a widely evenly distribution with a
 
 The histogram of _release_year_ shows a very distinctive distribution with most of the rated movies bein released around 1995. This information will come in handy when we come to regularization of the predictors.
 
+the two histograms of _movieId_ and _userId_ both show a wide range of occurances. That seems plausible since there are movies and users who have a high amount of ratings and those with very few ratings. In connection with the avg ratings per user and movie this will most likely become relevant when performing regularization.
 
 
 ##### Smoothplots for single predictors
@@ -174,6 +188,8 @@ edx %>% group_by(ts_year)%>%
   labs(title="Timestamp Year", y="Rating")+
   ylim(0,5)
 
+##deep dive ts_year because of non-conclusive data in 1995
+length(which(edx$ts_year==1995))
 
 ##plot ratings over timestamp_month (median, avg, se & smoothline)
 edx %>% group_by(ts_month)%>%
@@ -207,6 +223,11 @@ edx %>% group_by(ts_day)%>%
   labs(title="Timestamp Day", y="Rating")+
   ylim(0,5)
 
+##Dropping non-differentiating variables ts_month and ts_day
+edx <- edx[,1:7]
+validation <- validation[,1:7]
+
+
 ##plot ratings over release year of the movie (median, avg, se & smoothline)
 edx %>% group_by(rel_year)%>%
   summarize(
@@ -223,7 +244,7 @@ edx %>% group_by(rel_year)%>%
   labs(title="Release Year", y="Rating")+
   ylim(0,5)
 
-##plot ratings over genre w/n>1000 ratings (median, avg, se & smoothline)
+##plot ratings over genre w/n>1000 ratings (median, avg, se)
 edx %>% group_by(genres)%>%
   summarize(
     n=n(),
@@ -231,29 +252,42 @@ edx %>% group_by(genres)%>%
     med=median(rating),
     se= sd(rating)
   )%>%
-  filter(n>1000)%>%
   arrange(avg)%>%
+  filter(n>1000)%>%
   ggplot(aes(x=genres, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
   geom_errorbar(aes(alpha=0.3))+
-  labs(title="Genres > 1000 occurances", y="Rating")+
+  labs(title="Genres > 1000 occurances", y="Rating", x="")+
   ylim(0,5)
 
-##plot ratings over movieId (median, avg, se & smoothline)
+##plot ratings over movieId (median, avg)
 edx %>% group_by(movieId)%>%
   summarize(
     n=n(),
     avg=mean(rating),
-    med=median(rating),
-    se= sd(rating)
+    med=median(rating)
   )%>%
-  ggplot(aes(x=movieId, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
+  ggplot(aes(x=movieId, y=avg, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  #geom_errorbar(aes(alpha=0.3))+
   labs(title="MovieId", y="Rating", x="Movie Id")+
   ylim(0,5)
+
+##plot ratings over userId (median, avg)
+edx %>% group_by(userId)%>%
+  summarize(
+    n=n(),
+    avg=mean(rating),
+    med=median(rating)
+  )%>%
+  ggplot(aes(x=userId, y=avg, col="avg"))+
+  geom_point()+
+  geom_point(aes(y=med, col="median"))+
+  labs(title="UserId", y="Rating", x="User Id")+
+  ylim(0,5)
+
+
 ```
 
 
@@ -289,11 +323,13 @@ The data provides a very useful insight to the predictor. We can see that avg an
 To get a better overview we limit the graph to genres with more than 1000 occurances. Looking at the results we can see that there are significant differences between different genres. Using genres as a predictor would enable us to account for quite some variation in the data set. As it is categorical data we don't see a smoothplot.
 
 #### MovieId
-Analyzing  rating over MoviId we can see the strongest spread between avg and median ratings. We can see the full scale between 0.5 and 5 in the median range. Using the movieId as a predictor should account for most of the variation. 
+Analyzing  rating over MoviId we can see the strongest spread between avg and median ratings. We can see the full range between 0.5 and 5 in the median range. Using the movieId as a predictor should account for most of the variation. 
 
+#### UserId
+The userId is also showing a lot of variation. Similar to MOvieId as a predictor we can observe the full range of possible ratings. Next to MOvieId this should be the second predictor to start with.
 
-
-To create the models we will use the five remaining predictors
+#### Concluding insights
+To create the models we will use the five predictors
 1. movieId
 2. userId
 3. genres
@@ -304,11 +340,42 @@ To create the models we will use the five remaining predictors
 
 ### modeling approach
 
+In order to find the best performing model we will use the predictors as described in the prior chapter individually or in combination and apply different methods to train the models.
 
-We will use the predictors as described in the prior chapter. 
+#### Initialization of modelling
+The data set edx is split into a training set (90% of the data) and a test set (10% of the data). 
+```{r modelling data setup, echo=f}
+set.seed(1, sample.kind="Rounding")
+test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.1, list = FALSE)
+edx_train <- edx[-test_index,]
+edx_test <- edx[test_index,]
+
+edx_test <- edx_test %>% 
+  semi_join(edx_train, by = "movieId") %>%
+  semi_join(edx_train, by = "userId")
+
+```
+Secondly the target function is defined. As we are aiming to minimize the rooted mean square error (RMSE) the function is defined as follows:
+```{r rmse}
+#DEFINE RMSE-FUNCTION
+RMSE <- function(true_ratings, predicted_ratings){
+  sqrt(mean((true_ratings - predicted_ratings)^2))
+}
+```
+The last two intitialisation procedures include calculating the mean rating (as it is used for quite few of the model calculations) and setting up a dataframe to compare the results of the different models.
+
+```{r}
+#Calculate Mu (average)
+mu <- mean(edx_train$rating) 
+
+#set up results dataframe
+rmse_results <- data.frame(method = character(),
+                           RMSE = numeric())
+```
+
 
 #### List of prediction models
-We will compare various prediction models and combinations of predictors by their performance. They are described by the following code:
+The models used are described by the following code: 
 
 Model 1 - Average
 Model 2 - Linear Models
@@ -323,10 +390,11 @@ Model 2 - Linear Models
   Model 2.3 - Models with 3 predictors
     Model 2.3.1 - movieId + userId + genres
     Model 2.3.2 - movieId + userId + rel_year
+    MOdel 2.3.3 - movieId + userId + ts_year
   Model 2.4 - Models with 4 predictors
     Model 2.4.1 - movieId + userId + genres + rel_year
     Model 2.4.2 - movieId + userId + genres + ts_year
-  Model 2.5 - Model with 5 predictos 
+  Model 2.5 - Model with 5 predictors 
   Model 2.6 - Top performing linear model with regularized predictors
 Model 3 - knn
 Model 4 - decision tree
@@ -334,11 +402,420 @@ Model 5 - loess
 Model 6 - random forest
 Model 7 - GLM
 
+Some of the models didn't run due to computing power constraints. Those models are marked as _"not able to run"_ and are not included in the comparison of best performing model. However, they are kept in the overview and code, ready to run for anybody with a more potent computer.
+
+#### Model 1 - Average
+The average is the starting model and is the basis that we always need to beat. 
+It results in a RMSE of 
+```{r M_avg, echo=false}
+####MODEL 1 - AVERAGE####
+avg_rmse <- RMSE(edx_test$rating, mu)
+
+
+# add results to dataframe to compare performance of models#
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="1 - Average",
+                                     RMSE = avg_rmse ))
+rmse_results %>% knitr::kable()
+```
+
+
+#### Model 2 - Linear models
+The group of linear models is the biggest in this project and is divided in groups defined by the number of used predictors. The best performing model is finally optimized by using regularization. 
+In general the models always work by analyzing the difference between the avg rating of a certain predictor and the overall avg rating. This value is then used to calculate the prediction by adding it to the mean. 
+
+##### Linear models with one predictor
+
+The two most promising predictors are MovieId and UserId and are compared by running a model based on a single predictor.
+```{r M_lin1, echo=false}
+####MODEL 2.1.1 - LM with movieId####
+
+set.seed(1, sample.kind = "Rounding")
+
+movie_avgs <- edx_train %>% 
+  group_by(movieId) %>% 
+  summarize(b_i = mean(rating - mu))
+
+predicted_ratings <- mu + edx_test %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  .$b_i
+
+predicted_ratings <- ifelse(!is.na(predicted_ratings),predicted_ratings, mu)
+
+model_2.1.1_rmse <- RMSE(edx_test$rating, predicted_ratings)
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="2.1.1 - linear movieId",
+                                     RMSE = model_2.1.1_rmse ))
+####MODEL 2.1.2 - LM with userId####
+
+set.seed(1, sample.kind = "Rounding")
+
+user_avgs <- edx_train %>% 
+  group_by(userId) %>% 
+  summarize(b_u = mean(rating-mu))
+
+predicted_ratings <- mu + edx_test %>% 
+  left_join(user_avgs, by='userId') %>%
+  .$b_u
+
+predicted_ratings <- ifelse(!is.na(predicted_ratings),predicted_ratings, mu)
+
+model_2.1.2_rmse <- RMSE(edx_test$rating, predicted_ratings)
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="2.1.2 - linear userId",
+                                     RMSE = model_2.1.2_rmse ))
+rmse_results %>% knitr::kable()
+```
+As we can see movieId has a slightly lower RMSE and is therefore the better predictor.
+
+##### Linear models with two predictors
+
+In this group of predictors we follow the same approach but use two predictors. The predictor mix is always chosen in a way that either movieId or userId are the first one and will be paired with one of the remaining other three predictors.
+Recalling certain correlations it doesnot make sense to try out every possible combination as for example release year and movieId are highly correlated.
+```{r M_lin2, echo=false}
+####MODEL 2.2.1 - LM with movieId + userId####
+
+set.seed(1, sample.kind = "Rounding")
+
+user_avgs <- edx_train %>% 
+  left_join(movie_avgs, by='movieId')%>%
+  group_by(userId) %>% 
+  summarize(b_u = mean(rating-mu-b_i))
+
+
+predicted_ratings <- edx_test %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  left_join(user_avgs, by='userId') %>%
+  mutate(pred = mu + b_i + b_u) %>%
+  .$pred
+
+predicted_ratings <- ifelse(!is.na(predicted_ratings),predicted_ratings, mu)
+
+model_2.2.1_rmse <- RMSE(edx_test$rating, predicted_ratings)
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="2.2.1 - linear movieId + userId",
+                                     RMSE = model_2.2.1_rmse ))
+
+
+####MODEL 2.2.2 - LM with movieId + ts_year####
+
+set.seed(1, sample.kind = "Rounding")
+
+movie_avgs <- edx_train %>% 
+  group_by(movieId) %>% 
+  summarize(b_i = mean(rating - mu))
+
+ts_year_avgs <- edx_train %>%
+  left_join(movie_avgs, by='movieId')%>%
+  group_by(ts_year)%>%
+  summarize(b_tsy = mean(rating-mu-b_i))
+
+predicted_ratings <- edx_test %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  left_join(ts_year_avgs, by='ts_year') %>%
+  mutate(pred = mu + b_i + b_tsy) %>%
+  .$pred
+
+predicted_ratings <- ifelse(!is.na(predicted_ratings),predicted_ratings, mu+b_i)
+
+model_2.2.2_rmse <- RMSE(edx_test$rating, predicted_ratings)
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="2.2.2 - linear movieId + ts_year",
+                                     RMSE = model_2.2.2_rmse ))
+
+
+####MODEL 2.2.3 - LM with userId + genres####
+
+set.seed(1, sample.kind = "Rounding")
+
+genres_avgs <- edx_train %>% 
+  left_join(user_avgs, by='userId') %>%
+  group_by(genres) %>%
+  summarize(b_gen = mean(rating - mu - b_u)) 
+
+predicted_ratings <- edx_test %>% 
+  left_join(genres_avgs, by='genres') %>%
+  left_join(user_avgs, by='userId') %>%
+  mutate(pred = mu + b_gen + b_u) %>%
+  .$pred
+
+predicted_ratings <- ifelse(!is.na(predicted_ratings),predicted_ratings, mu+b_i)
+
+model_2.2.3_rmse <- RMSE(edx_test$rating, predicted_ratings)
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="2.2.3 - linear userId + genres",
+                                     RMSE = model_2.2.3_rmse ))
+
+
+####MODEL 2.2.4 - LM with userId + rel_year####
+
+set.seed(1, sample.kind = "Rounding")
+
+rely_avgs <- edx_train %>% 
+  left_join(user_avgs, by='userId') %>%
+  group_by(rel_year) %>%
+  summarize(b_rely = mean(rating - mu - b_u)) 
+
+predicted_ratings <- edx_test %>% 
+  left_join(rely_avgs, by='rel_year') %>%
+  left_join(user_avgs, by='userId') %>%
+  mutate(pred = mu + b_rely + b_u) %>%
+  .$pred
+
+predicted_ratings <- ifelse(!is.na(predicted_ratings),predicted_ratings, mu+b_i)
+
+model_2.2.4_rmse <- RMSE(edx_test$rating, predicted_ratings)
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="2.2.4 - linear userId + rel_year",
+                                     RMSE = model_2.2.4_rmse ))
+rmse_results %>% knitr::kable()
+
+```
+The results show that the model with the lowest RMSE is the combination of movieId and userId. This combination will also be the basis for all next models.
+
+
+##### Linear models with three predictors
+The two predictors movieId and userId are combined with the genre in the first model and with the release year in the second model.
+```{r M_lin3, echo=false}
+####MODEL 2.3.1 - LM with userId + movieId + genre
+
+gc() #garbage collection to free memory
+
+set.seed(1, sample.kind = "Rounding")
+
+genre_avgs <- edx_train %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  left_join(user_avgs, by='userId') %>%
+  group_by(genres) %>%
+  summarize(b_g = mean(rating - mu - b_i - b_u)) 
+
+pred_ratings <- edx_test %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  left_join(user_avgs, by='userId') %>%
+  left_join(genre_avgs, by='genres')%>%
+  mutate(pred = mu + b_i + b_u + b_g) %>%
+  .$pred
+
+pred_ratings <- ifelse(!is.na(pred_ratings),pred_ratings, mu+b_i+b_u)
+
+model_2.3.1_rmse <- RMSE(edx_test$rating, pred_ratings)
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="2.3.1 - linear movieId + userId + genre",
+                                     RMSE = model_2.3.1_rmse ))
+
+####MODEL 2.3.2 - LM with userId + movieId + rel_year
+
+gc() #garbage collection to free memory
+
+set.seed(1, sample.kind = "Rounding")
+
+rely_avgs <- edx_train %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  left_join(user_avgs, by='userId') %>%
+  group_by(rel_year) %>%
+  summarize(b_g = mean(rating - mu - b_i - b_u)) 
+
+pred_ratings <- edx_test %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  left_join(user_avgs, by='userId') %>%
+  left_join(rely_avgs, by='rel_year')%>%
+  mutate(pred = mu + b_i + b_u + b_g) %>%
+  .$pred
+
+pred_ratings <- ifelse(!is.na(pred_ratings),pred_ratings, mu+b_i+b_u)
+
+model_2.3.2_rmse <- RMSE(edx_test$rating, pred_ratings)
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="2.3.2 - linear movieId + userId + rel_year",
+                                     RMSE = model_2.3.2_rmse ))
+
+####MODEL 2.3.3 - LM with userId + movieId + ts_year
+
+gc() #garbage collection to free memory
+
+set.seed(1, sample.kind = "Rounding")
+
+ts_year_avgs <- edx_train %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  left_join(user_avgs, by='userId') %>%
+  group_by(ts_year) %>%
+  summarize(b_tsy = mean(rating - mu - b_i - b_u)) 
+
+pred_ratings <- edx_test %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  left_join(user_avgs, by='userId') %>%
+  left_join(ts_year_avgs, by='ts_year')%>%
+  mutate(pred = mu + b_i + b_u + b_tsy) %>%
+  .$pred
+
+pred_ratings <- ifelse(!is.na(pred_ratings),pred_ratings, mu+b_i+b_u)
+
+model_2.3.3_rmse <- RMSE(edx_test$rating, pred_ratings)
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="2.3.3 - linear movieId + userId + rel_year",
+                                     RMSE = model_2.3.3_rmse ))
+rmse_results %>% knitr::kable()
+
+```
+The results show that the best performing model is now the one with movieId, userId and genre as predictors. It seems that genre accounts for more separate uncertainty compared to release year. The reason could be that release year and movieId are correlated to some degree and account for the same uncertainty.
+
+
+##### Linear models with four predictors
+The best performing model with three predictors is complemented with rel_year and ts_year and the final performance is shown in the following overview:
+```{r M_lin4, echo=false}
+####MODEL 2.4.1 - LM with movieId + userId + genre + rel_year
+
+gc() #garbage collection to free memory
+
+set.seed(1, sample.kind = "Rounding")
+
+rel_year_avgs <- edx_train %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  left_join(user_avgs, by='userId') %>%
+  left_join(genre_avgs, by='genres')%>%
+group_by(rel_year) %>%
+  summarize(b_ry = mean(rating - mu - b_i - b_u - b_g)) 
+
+pred_ratings <- edx_test %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  left_join(user_avgs, by='userId') %>%
+  left_join(genre_avgs, by='genres')%>%
+  left_join(rel_year_avgs, by='rel_year')%>%
+mutate(pred = mu + b_i + b_u + b_g + b_ry) %>%
+  .$pred
+
+pred_ratings <- ifelse(!is.na(pred_ratings),pred_ratings, mu+b_i+b_u+b_g)
+
+model_2.4.1_rmse <- RMSE(edx_test$rating, pred_ratings)
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="2.4.1 - linear movieId + userId + genre + rel_year",
+                                     RMSE = model_2.4.1_rmse ))
+
+
+####Model 2.4.2 - movieId + userId + genres + ts_year####
+
+gc() #garbage collection to free memory
+
+set.seed(1, sample.kind = "Rounding")
+
+ts_year_avgs <- edx_train %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  left_join(user_avgs, by='userId') %>%
+  left_join(genre_avgs, by='genres')%>%
+  group_by(ts_year) %>%
+  summarize(b_tsy = mean(rating - mu - b_i - b_u - b_g)) 
+
+pred_ratings <- edx_test %>% 
+  left_join(movie_avgs, by='movieId') %>%
+  left_join(user_avgs, by='userId') %>%
+  left_join(genre_avgs, by='genres')%>%
+  left_join(ts_year_avgs, by='ts_year')%>%
+  mutate(pred = mu + b_i + b_u + b_g + b_tsy) %>%
+  .$pred
+
+pred_ratings <- ifelse(!is.na(pred_ratings),pred_ratings, mu+b_i+b_u+b_g)
+
+model_2.4.2_rmse <- RMSE(edx_test$rating, pred_ratings)
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="2.4.2 - linear movieId + userId + genre + ts_year",
+                                     RMSE = model_2.4.2_rmse ))
+rmse_results %>% knitr::kable()
+
+```
+As we see the best performing model so far is 2.4.1 - using movieId + userId + genre + rel_year as predictors. This model will be regularized to account for the different weight of adjustments based on the number of ratings.
+
+##### Regularized linear model
+In order to regularize the impact of the four predictors we will need to penalize predictor values with very few occurrences. In order to do so we define a value lambda that leads to an overall minimized RMSE. That means minimizing the following formula:
+
+$$
+
+
+```{r M_lin_reg}
+gc()
+
+set.seed(1, sample.kind = "Rounding")
+
+lambdas <- seq(1, 5, 0.25)
+rmses <- sapply(lambdas, function(l){
+  mu <- mean(edx_train$rating)
+  b_i <- edx_train %>% #penalize movieId with few n()
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - mu)/(n()+l))
+  b_u <- edx_train %>% #penalize userId with few n()
+    left_join(b_i, by="movieId") %>%
+    group_by(userId) %>%
+    summarize(b_u = sum(rating - b_i - mu)/(n()+l))
+  b_g <- edx_train %>% ###penalize genres with few n()
+    left_join(b_i, by="movieId") %>%
+    left_join(b_u, by="userId") %>%
+    group_by(genres)%>%
+    summarize(b_g = sum(rating-b_i-b_u-mu)/(n()+l))
+  b_ry <- edx_train %>% ###penalize rel_years with few n()
+    left_join(b_i, by='movieId') %>%
+    left_join(b_u, by='userId') %>%
+    left_join(b_g, by='genres')%>%
+    group_by(rel_year) %>%
+    summarize(b_ry = mean(rating - mu - b_i - b_u - b_g)/(n()+l))
+  
+  predicted_ratings <- 
+    edx_test %>% 
+    left_join(b_i, by = "movieId") %>%
+    left_join(b_u, by = "userId") %>%
+    left_join(b_g, by = "genres") %>%
+    left_join(b_ry, by ="rel_year")%>%
+    mutate(pred = mu + b_i + b_u + b_g + b_ry) %>%
+    .$pred
+  return(RMSE(edx_test$rating, predicted_ratings))
+})
+
+qplot(lambdas, rmses)  
+
+lambda <- lambdas[which.min(rmses)]
+lambda
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="Regularized 2.4.1 - movie+user+genre+rel_year",  
+                                     RMSE = min(rmses)))
+rmse_results %>% knitr::kable()
+```
+
+
+
+#### Model 3 - knn
+ _"not able to run"_
+#### Model 4 - decision tree
+_"not able to run"_
+#### Model 5 - loess
+```{r M_loess, echo=false}
+
+```
+
+#### Model 6 - random forest
+_"not able to run"_
+#### Model 7 - GLM
+```{r M_glm, echo=false}
+
+```
+
+
+
 
 ## Results
-Following the approach mentioned above we can see that we reach the best result by combining the predictor set X (a, b, c, d) with the prediction method Y (ensemble)
-```{r echo=false rmse_results %>% knitr::kable()}
+Following the approach mentioned above we can see that we reach the best result by running a linear regularized model with the 4 predictors _movieId_, _userId_, _genres_, _rel_year_
 
+```{r echo=false }
+rmse_results %>% knitr::kable()
 ````
 
 
@@ -347,10 +824,7 @@ Following the approach mentioned above we can see that we reach the best result 
 
 ## Conclusion
 To sum up the results of this report it was possible to train an algorithm and reach an _RMSE of _.
-The best performance was reached by using Model _2.5.2_ with a regularized :
-* 
-* 
-*
+The best performance was reached by using Model _2.5.2_ with a regularized approach:
 
 
 The limitations of this report lie in the limited data used and in the approach chosen, with a limited amount of pre-chosen predictors. Secondly some of the methods couldn´t be used due to a limitation of computing power. 
