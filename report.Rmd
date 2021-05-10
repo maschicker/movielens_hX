@@ -735,13 +735,17 @@ rmse_results %>% knitr::kable()
 ```
 As we see the best performing model so far is 2.4.1 - using movieId + userId + genre + rel_year as predictors. This model will be regularized to account for the different weight of adjustments based on the number of ratings.
 
+##### Linear models with five predictors
+_"not able to run"_
+
 ##### Regularized linear model
 In order to regularize the impact of the four predictors we will need to penalize predictor values with very few occurrences. In order to do so we define a value lambda that leads to an overall minimized RMSE. That means minimizing the following formula:
 
-$$
+$\frac{1}{N}\sum_{u, i, g, ry}(y_{u, i, g, ry}-\mu-b_i-b_u-b_g-b_{ry})^2 + \lambda(\sum_i b_{i}^2 + \sum_u b_{u}^2 + \sum_g b_{g}^2 + \sum_{ry} b_{ry}^2)$
 
+The following graph shows the lambda that minimizes the RMSE and the corresponding RMSE in the comparison table.
 
-```{r M_lin_reg}
+```{r M_lin_reg, echo=false}
 gc()
 
 set.seed(1, sample.kind = "Rounding")
@@ -798,14 +802,43 @@ rmse_results %>% knitr::kable()
 _"not able to run"_
 #### Model 5 - loess
 ```{r M_loess, echo=false}
+####MODEL 5 - LOESS#### 
+
+train_loess <- train(rating ~userId+movieId, 
+                     method = "gamLoess", 
+                     data = edx_train)
+model5_predict <- predict(train_loess, edx_test)
+
+model_5_rmse <- RMSE(edx_test$rating, model5_predict)
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="5 - gamLOESS",
+                                     RMSE = model_5_rmse ))
+rmse_results %>% knitr::kable()
 
 ```
 
 #### Model 6 - random forest
 _"not able to run"_
 #### Model 7 - GLM
-```{r M_glm, echo=false}
+As a last model for comparison the generalized linear model is used. Due to computing power we use a model with only two predictors (_movieId_ and _userId_). As expected the results are not as good as the ones from a regularized linear model with four predictors.
 
+```{r M_glm, echo=false}
+####MODEL 7 - GLM####
+
+train_glm <- train(rating ~userId+movieId, 
+                   method = "glm", 
+                   data = edx_train)
+train_glm$bestTune
+model7_predict <- predict(train_glm, edx_test, type="response")
+
+
+model_7_rmse <- RMSE(edx_test$rating, model7_predict)
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="Model 7 - GLM",
+                                     RMSE = model_7_rmse ))
+rmse_results %>% knitr::kable()
 ```
 
 
@@ -813,21 +846,67 @@ _"not able to run"_
 
 ## Results
 Following the approach mentioned above we can see that we reach the best result by running a linear regularized model with the 4 predictors _movieId_, _userId_, _genres_, _rel_year_
+This model is validated on the validation data set. As lambda we use the evaluated value of 4.75. As there are very few rows that didn't show up in the training data the prediction function creates a few NA-values that can be identified in the summary. A check shows the titles of those few movies. In order to make the model work these prediction values are substituted with mu and the final RMSE is calculated.
 
-```{r echo=false }
+```{r results, echo=false }
+#########VALIDATE BEST MODEL#########
+
+
+l <- 4.75 #value based on the cross-validation of model 1.4.1
+  b_i <- edx_train %>% #penalize movieId with few n()
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - mu)/(n()+l))
+  b_u <- edx_train %>% #penalize userId with few n()
+    left_join(b_i, by="movieId") %>%
+    group_by(userId) %>%
+    summarize(b_u = sum(rating - b_i - mu)/(n()+l))
+  b_g <- edx_train %>% ###penalize genres with few n()
+    left_join(b_i, by="movieId") %>%
+    left_join(b_u, by="userId") %>%
+    group_by(genres)%>%
+    summarize(b_g = sum(rating-b_i-b_u-mu)/(n()+l))
+  b_ry <- edx_train %>% ###penalize rel_years with few n()
+    left_join(b_i, by='movieId') %>%
+    left_join(b_u, by='userId') %>%
+    left_join(b_g, by='genres')%>%
+    group_by(rel_year) %>%
+    summarize(b_ry = mean(rating - mu - b_i - b_u - b_g)/(n()+l))
+ 
+  # final prediction 
+  final_predict <- 
+    validation %>% 
+    left_join(b_i, by = "movieId") %>%
+    left_join(b_u, by = "userId") %>%
+    left_join(b_g, by = "genres") %>%
+    left_join(b_ry, by ="rel_year")%>%
+    mutate(pred = mu + b_i + b_u + b_g + b_ry) %>%
+    .$pred
+  
+summary(final_predict) #look for NA´s in the data
+validation %>% filter(is.na(final_predict))%>%.$title #check titles of movies w/NA´s
+final_predict <- replace(final_predict, is.na(final_predict), mu) #exchange NA´s with avg rating
+  
+  final_model_rmse <- RMSE(validation$rating, final_predict)
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="VALIDATION - Regularized 2.4.1 - movie+user+genre+rel_year",  
+                                     RMSE = final_model_rmse))
 rmse_results %>% knitr::kable()
+
 ````
 
 
-### comparison of model performance
+This is expected as we have seen in the analyzed data that the rankings vary largely across the predictor´s range of values. 
+GLM performs lower because it assumes a linear context for all predictors.
+The local weighted regression (loess model) assumes that the within very small windows of data the data is linear resp. parabolic. That allows for an overall non-linear context looking at the whole range of data. However this approach considers data points within a span and weights them differently. Looking at predictors like _movieId_ or _userId_ this approach would not work very well because the Ids have a rather categorical character and two movies or users with very close Ids have independent ratings. However, looking at predictors like _rel_year_ this method could produce better results vompared to an overall linear estimate.
 
 
 ## Conclusion
 To sum up the results of this report it was possible to train an algorithm and reach an _RMSE of _.
-The best performance was reached by using Model _2.5.2_ with a regularized approach:
+The best performance was reached by using Model _2.6_ with a regularized approach.
 
 
 The limitations of this report lie in the limited data used and in the approach chosen, with a limited amount of pre-chosen predictors. Secondly some of the methods couldn´t be used due to a limitation of computing power. 
+In this analysis we only use a fraction of the possible combinations of predictors and training models. Separate predictors with separate models depending on the distribution and for example using an ensemble of thos could also be an option to improve performance.  
 Next steps to improve performance would be to use other predictors like director, actors, country of origin, languages available, production cost, movie length, amount of awards, and more...
 One could also analyze for trigger words within the title and check if there are correlations with ratings if the title contains words like "Love", "reloaded", "fight" or others.
 Another way would also be to increase training data size, or use neural networks to find new predictors using deep learning algorithms. In order to do so we would need to provide a broader data base.

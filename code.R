@@ -181,7 +181,7 @@ edx %>% group_by(ts_year)%>%
   ggplot(aes(x=ts_year, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  geom_errorbar(aes(alpha=0.3))+
+  geom_errorbar(aes(alpha=0.3), show.legend = FALSE)+
   geom_smooth()+
   labs(title="Timestamp Year", y="Rating")+
   ylim(0,5)
@@ -200,7 +200,7 @@ edx %>% group_by(ts_month)%>%
   ggplot(aes(x=ts_month, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  geom_errorbar(aes(alpha=0.3))+
+  geom_errorbar(aes(alpha=0.3), show.legend = FALSE)+
   geom_smooth()+
   labs(title="Timestamp Month", y="Rating")+
   ylim(0,5)
@@ -216,7 +216,7 @@ edx %>% group_by(ts_day)%>%
   ggplot(aes(x=ts_day, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  geom_errorbar(aes(alpha=0.3))+
+  geom_errorbar(aes(alpha=0.3), show.legend = FALSE)+
   geom_smooth()+
   labs(title="Timestamp Day", y="Rating")+
   ylim(0,5)
@@ -237,7 +237,7 @@ edx %>% group_by(rel_year)%>%
   ggplot(aes(x=rel_year, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  geom_errorbar(aes(alpha=0.3))+
+  geom_errorbar(aes(alpha=0.3), show.legend = FALSE)+
   geom_smooth()+
   labs(title="Release Year", y="Rating")+
   ylim(0,5)
@@ -255,7 +255,7 @@ edx %>% group_by(genres)%>%
   ggplot(aes(x=genres, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  geom_errorbar(aes(alpha=0.3))+
+  geom_errorbar(aes(alpha=0.3), show.legend = FALSE)+
   labs(title="Genres > 1000 occurances", y="Rating", x="")+
   ylim(0,5)
 
@@ -284,6 +284,7 @@ edx %>% group_by(userId)%>%
   geom_point(aes(y=med, col="median"))+
   labs(title="UserId", y="Rating", x="User Id")+
   ylim(0,5)
+
 
 
 #########MODELING#########
@@ -476,7 +477,7 @@ rmse_results %>% knitr::kable()
 
 
 
-####MODEL 2.3.1 - LM with userId + movieId + genre
+####MODEL 2.3.1 - LM with userId + movieId + genre####
 
 gc() #garbage collection to free memory
 
@@ -506,7 +507,7 @@ rmse_results %>% knitr::kable()
 
 
 
-####MODEL 2.3.2 - LM with userId + movieId + rel_year
+####MODEL 2.3.2 - LM with userId + movieId + rel_year####
 
 gc() #garbage collection to free memory
 
@@ -535,7 +536,7 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results %>% knitr::kable()
 
 
-####MODEL 2.3.3 - LM with userId + movieId + ts_year
+####MODEL 2.3.3 - LM with userId + movieId + ts_year####
 
 gc() #garbage collection to free memory
 
@@ -563,7 +564,7 @@ rmse_results <- bind_rows(rmse_results,
                                      RMSE = model_2.3.3_rmse ))
 rmse_results %>% knitr::kable()
 
-####MODEL 2.4.1 - LM with movieId + userId + genre + rel_year
+####MODEL 2.4.1 - LM with movieId + userId + genre + rel_year####
 
 gc() #garbage collection to free memory
 
@@ -629,7 +630,7 @@ rmse_results %>% knitr::kable()
 
 
 
-####MODEL2.6 - REGULARIZED LINEAR MODEL####
+####MODEL 2.6 - REGULARIZED LINEAR MODEL####
 
 ####use cross validation to find the best lambda for model 2.4.1
 gc()
@@ -684,7 +685,7 @@ rmse_results %>% knitr::kable()
 set.seed(1, sample.kind = "Rounding")
 train_knn <- train(rating ~ userId+movieId+ts_year+rel_year, method = "knn", 
                    data = edx_train,
-                   #tuneGrid = data.frame(k = seq(9, 51, 3))
+                   tuneGrid = data.frame(k = seq(9, 51, 3))
                    )
 ggplot(train_knn, highlight = TRUE)
 train_knn$bestTune
@@ -704,10 +705,12 @@ rmse_results %>% knitr::kable()
 # NOT WORKING
 
 set.seed(1, sample.kind = "Rounding")
-control <- trainControl(method = "cv", number = 10, p = .9)
+b<- 2
+
+control <- trainControl(method = "cv", number = b, p = .99)
 train_knn_cv <- train(rating ~ userId+movieId+rel_year, method = "knn", 
                       data = edx_train,
-                     # tuneGrid = data.frame(k = seq(9, 51, 3)),
+                      tuneGrid = data.frame(k = 7),
                       trControl = control)
 ggplot(train_knn_cv, highlight = TRUE)
 
@@ -747,8 +750,11 @@ rmse_results <- bind_rows(rmse_results,
 
 ####MODEL 5 - LOESS#### 
 
-train_loess <- train(rating ~userId+movieId, 
+
+train_loess <- train(rating ~movieId, 
                      method = "gamLoess", 
+                     family="symmetric",
+                     tuneGrid = data.frame(span = 0.01, degree=2 ),
                      data = edx_train)
 model5_predict <- predict(train_loess, edx_test)
 
@@ -786,7 +792,7 @@ train_glm <- train(rating ~userId+movieId,
                    method = "glm", 
                    data = edx_train)
 train_glm$bestTune
-model7_predict <- predict(train_glm, edx_test)
+model7_predict <- predict(train_glm, edx_test, type="response")
 
 
 model_7_rmse <- RMSE(edx_test$rating, model7_predict)
