@@ -633,7 +633,7 @@ rmse_results %>% knitr::kable()
 ####MODEL 2.6 - REGULARIZED LINEAR MODEL####
 
 ####use cross validation to find the best lambda for model 2.4.1
-gc()
+gc()#free memory to run model
 
 set.seed(1, sample.kind = "Rounding")
 
@@ -686,7 +686,7 @@ set.seed(1, sample.kind = "Rounding")
 train_knn <- train(rating ~ userId+movieId+ts_year+rel_year, method = "knn", 
                    data = edx_train,
                    tuneGrid = data.frame(k = seq(9, 51, 3))
-                   )
+)
 ggplot(train_knn, highlight = TRUE)
 train_knn$bestTune
 train_knn$finalModel
@@ -702,15 +702,14 @@ rmse_results %>% knitr::kable()
 
 
 ####MODEL 3.2 - knn-cross-validation#### 
-# NOT WORKING
+#EXTREMELY LONG RUNTIME ==> 2 days...not working
 
 set.seed(1, sample.kind = "Rounding")
-b<- 2
 
-control <- trainControl(method = "cv", number = b, p = .99)
+control <- trainControl(method = "cv", number = 2, p = .9)
 train_knn_cv <- train(rating ~ userId+movieId+rel_year, method = "knn", 
                       data = edx_train,
-                      tuneGrid = data.frame(k = 7),
+                      tuneGrid = data.frame(k = seq(3,51,3)),
                       trControl = control)
 ggplot(train_knn_cv, highlight = TRUE)
 
@@ -750,11 +749,8 @@ rmse_results <- bind_rows(rmse_results,
 
 ####MODEL 5 - LOESS#### 
 
-
 train_loess <- train(rating ~movieId, 
                      method = "gamLoess", 
-                     family="symmetric",
-                     tuneGrid = data.frame(span = 0.01, degree=2 ),
                      data = edx_train)
 model5_predict <- predict(train_loess, edx_test)
 
@@ -764,7 +760,7 @@ rmse_results <- bind_rows(rmse_results,
                           data_frame(method="5 - gamLOESS",
                                      RMSE = model_5_rmse ))
 
-
+rmse_results %>% knitr::kable()
 
 ####MODEL 6 - Random Forest####
 ##NOT WORKING - Lack of memory

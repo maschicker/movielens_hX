@@ -7,6 +7,68 @@ output: pdf_document
 
 ``` {r setup, include=FALSE, eval=T, echo=F, message=F, warning=F}
 knitr::opts_chunk$set(echo = TRUE)
+#######INSTALL PACKAGES#######
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(corrplot)) install.packages("corrplot", repos = "http://cran.us.r-project.org")
+if(!require(gam)) install.packages("gam", repos = "http://cran.us.r-project.org")
+
+
+library(tidyverse)
+library(caret)
+library(data.table)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(lubridate)
+library(corrplot)
+library(rpart)
+library(matrixStats)
+library(gam)
+library(splines)
+
+
+######## Create edx set, validation set (final hold-out test set) #######
+
+# MovieLens 10M dataset:
+# https://grouplens.org/datasets/movielens/10m/
+# http://files.grouplens.org/datasets/movielens/ml-10m.zip
+
+dl <- tempfile()
+download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+
+ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+                 col.names = c("userId", "movieId", "rating", "timestamp"))
+
+movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
+colnames(movies) <- c("movieId", "title", "genres")
+
+# if using R 4.0 or later:
+movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
+                                           title = as.character(title),
+                                           genres = as.character(genres))
+
+
+movielens <- left_join(ratings, movies, by = "movieId")
+
+# Validation set will be 10% of MovieLens data
+set.seed(1, sample.kind="Rounding") # if using R 3.5 or earlier, use `set.seed(1)`
+test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
+edx <- movielens[-test_index,]
+temp <- movielens[test_index,]
+
+# Make sure userId and movieId in validation set are also in edx set
+validation <- temp %>% 
+  semi_join(edx, by = "movieId") %>%
+  semi_join(edx, by = "userId")
+
+# Add rows removed from validation set back into edx set
+removed <- anti_join(temp, validation)
+edx <- rbind(edx, removed)
+
+rm(dl, ratings, movies, test_index, temp, movielens, removed)
+
 ```
 
 
@@ -55,7 +117,11 @@ In order to work with the data set it is analyzed and altered
 To get a first overview about the data the following table is created:
 ```{r analysis 1, echo=false}
 summary(edx)
-dim(edx)
+```
+The dimansions of the data file are 
+```{r, echo=false} dim(edx)``` 
+The data classes are shown in the following table
+```{r classes, echo=true}
 sapply(edx, class)
 ```
 We can see that the data set edx consists of ```{r rows, echo=false} nrow(edx)``` rows and six columns with numerical and character variables. There are no NA-Values and on first sight plausible min and max values, so the data quality looks good. 
@@ -73,14 +139,40 @@ Since integer valus occupy only half space compared to numeric the columns with 
 
 The new summary of edx looks like this:
 ```{r sum_new, echo=false}
+# extract release year from title column to create a new predictor for edx and validation
+# extract year, month and day from timestamp
+# convert numeric to integer if possible to half data size (8b-->4b) ==> higher modeling speed
+edx <- edx %>% 
+  mutate(rel_year = str_extract(title, "\\(\\d{4}\\)"), 
+         rel_year = as.integer(str_replace_all(rel_year,"\\(|\\)", "")), # remove parantheses and convert to integer
+         ts_year = as.integer(year(as_datetime(timestamp))),
+         ts_month = as.integer(month(as_datetime(timestamp), label = FALSE)),
+         ts_day = as.integer(wday(as_datetime(timestamp), label = FALSE)),
+         movieId = as.integer(movieId)
+        )
+
+validation <- validation %>%
+  mutate(rel_year = str_extract(title, "\\(\\d{4}\\)"), 
+         rel_year = as.integer(str_replace_all(rel_year,"\\(|\\)", "")), # remove parantheses and convert to integer
+         ts_year = as.integer(year(as_datetime(timestamp))),
+         ts_month = as.integer(month(as_datetime(timestamp), label = FALSE)),
+         ts_day = as.integer(wday(as_datetime(timestamp), label = FALSE)),
+         movieId = as.integer(movieId)
+         )
+
 summary(edx)
 ```
 
 
 #### Find duplicate entries
+```{r duplicates, echo=false}
+#look for duplicate entries
+problems <- which(duplicated(edx))
+
+```
 
 Duplicate entries could pose a problem for any algorithm so we need to check for them. 
-No duplicate entries could be found.
+``` {r, echo=false} length(problems)``` duplicate entries could be found.
 
 #### Find predictors that are highly correlated and remove if necessary
 ``` {r correlation, echo = FALSE}
@@ -96,6 +188,10 @@ d <- data.frame(userId = edx$userId,
 corrplot(cor(d), method = "number")
 ```
 As the correlation matrix shows there are only few correlated numeric variables that should be excluded from the analysis. ts_year is highly correlated with timestamp because it is directly derived from the timestamp. That means we can work with only one of the two. To speed up data handling the timestamp will be dropped from the edx and validation dataset. The movieId and the timestamp have a slight correlation which shows, that most ratings happen after and rather close to the release date of a movie. However, movieId and title are highly correlated, as every movie has it´s fixed title. Since we cannot rule out misspelling we will exclude the title and only go with movieId as a predictor. Title will be kept in the data set for check purposes before regularization. 
+```{r}
+edx <- edx[,-c("timestamp")]
+validation <- validation[,-c("timestamp")]
+```
 
 
 #### Remove predictors with near zero variation
@@ -188,9 +284,6 @@ edx %>% group_by(ts_year)%>%
   labs(title="Timestamp Year", y="Rating")+
   ylim(0,5)
 
-##deep dive ts_year because of non-conclusive data in 1995
-length(which(edx$ts_year==1995))
-
 ##plot ratings over timestamp_month (median, avg, se & smoothline)
 edx %>% group_by(ts_month)%>%
   summarize(
@@ -222,11 +315,6 @@ edx %>% group_by(ts_day)%>%
   geom_smooth()+
   labs(title="Timestamp Day", y="Rating")+
   ylim(0,5)
-
-##Dropping non-differentiating variables ts_month and ts_day
-edx <- edx[,1:7]
-validation <- validation[,1:7]
-
 
 ##plot ratings over release year of the movie (median, avg, se & smoothline)
 edx %>% group_by(rel_year)%>%
@@ -577,7 +665,7 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results %>% knitr::kable()
 
 ```
-The results show that the model with the lowest RMSE is the combination of movieId and userId. This combination will also be the basis for all next models.
+The results show that the model with the lowest RMSE is the combination of movieId and userId (2.2.1). This combination will also be the basis for all next models.
 
 
 ##### Linear models with three predictors
@@ -585,7 +673,7 @@ The two predictors movieId and userId are combined with the genre in the first m
 ```{r M_lin3, echo=false}
 ####MODEL 2.3.1 - LM with userId + movieId + genre
 
-gc() #garbage collection to free memory
+tmp <- gc() #garbage collection to free memory
 
 set.seed(1, sample.kind = "Rounding")
 
@@ -612,7 +700,7 @@ rmse_results <- bind_rows(rmse_results,
 
 ####MODEL 2.3.2 - LM with userId + movieId + rel_year
 
-gc() #garbage collection to free memory
+tmp <- gc() #garbage collection to free memory
 
 set.seed(1, sample.kind = "Rounding")
 
@@ -639,7 +727,7 @@ rmse_results <- bind_rows(rmse_results,
 
 ####MODEL 2.3.3 - LM with userId + movieId + ts_year
 
-gc() #garbage collection to free memory
+tmp <- gc() #garbage collection to free memory
 
 set.seed(1, sample.kind = "Rounding")
 
@@ -666,7 +754,7 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results %>% knitr::kable()
 
 ```
-The results show that the best performing model is now the one with movieId, userId and genre as predictors. It seems that genre accounts for more separate uncertainty compared to release year. The reason could be that release year and movieId are correlated to some degree and account for the same uncertainty.
+The results show that the best performing model is now the one with movieId, userId and genre as predictors (2.3.1). It seems that genre accounts for more separate uncertainty compared to release year. The reason could be that release year and movieId are correlated to some degree and account for the same uncertainty.
 
 
 ##### Linear models with four predictors
@@ -674,7 +762,7 @@ The best performing model with three predictors is complemented with rel_year an
 ```{r M_lin4, echo=false}
 ####MODEL 2.4.1 - LM with movieId + userId + genre + rel_year
 
-gc() #garbage collection to free memory
+tmp <- gc() #garbage collection to free memory
 
 set.seed(1, sample.kind = "Rounding")
 
@@ -704,7 +792,7 @@ rmse_results <- bind_rows(rmse_results,
 
 ####Model 2.4.2 - movieId + userId + genres + ts_year####
 
-gc() #garbage collection to free memory
+tmp <- gc() #garbage collection to free memory
 
 set.seed(1, sample.kind = "Rounding")
 
@@ -746,7 +834,7 @@ $\frac{1}{N}\sum_{u, i, g, ry}(y_{u, i, g, ry}-\mu-b_i-b_u-b_g-b_{ry})^2 + \lamb
 The following graph shows the lambda that minimizes the RMSE and the corresponding RMSE in the comparison table.
 
 ```{r M_lin_reg, echo=false}
-gc()
+tmp <- gc()
 
 set.seed(1, sample.kind = "Rounding")
 
@@ -786,7 +874,6 @@ rmses <- sapply(lambdas, function(l){
 qplot(lambdas, rmses)  
 
 lambda <- lambdas[which.min(rmses)]
-lambda
 
 rmse_results <- bind_rows(rmse_results,
                           data_frame(method="Regularized 2.4.1 - movie+user+genre+rel_year",  
@@ -794,13 +881,14 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results %>% knitr::kable()
 ```
 
-
+As you can see from the graph the minimum RMSE is reached with a lambda of ```{r, echo=false} lambda```
 
 #### Model 3 - knn
- _"not able to run"_
+ _"not able to run"_ 
 #### Model 4 - decision tree
 _"not able to run"_
 #### Model 5 - loess
+The local weighted regression (loess model) is being used on the two predictors _movieId_ and _userId_, takes a long time to run with results not much better compared to the overall rating average. 
 ```{r M_loess, echo=false}
 ####MODEL 5 - LOESS#### 
 
@@ -881,7 +969,7 @@ l <- 4.75 #value based on the cross-validation of model 1.4.1
     left_join(b_ry, by ="rel_year")%>%
     mutate(pred = mu + b_i + b_u + b_g + b_ry) %>%
     .$pred
-  
+
 summary(final_predict) #look for NA´s in the data
 validation %>% filter(is.na(final_predict))%>%.$title #check titles of movies w/NA´s
 final_predict <- replace(final_predict, is.na(final_predict), mu) #exchange NA´s with avg rating
@@ -892,21 +980,26 @@ rmse_results <- bind_rows(rmse_results,
                                      RMSE = final_model_rmse))
 rmse_results %>% knitr::kable()
 
-````
+```
 
 
 This is expected as we have seen in the analyzed data that the rankings vary largely across the predictor´s range of values. 
 GLM performs lower because it assumes a linear context for all predictors.
-The local weighted regression (loess model) assumes that the within very small windows of data the data is linear resp. parabolic. That allows for an overall non-linear context looking at the whole range of data. However this approach considers data points within a span and weights them differently. Looking at predictors like _movieId_ or _userId_ this approach would not work very well because the Ids have a rather categorical character and two movies or users with very close Ids have independent ratings. However, looking at predictors like _rel_year_ this method could produce better results vompared to an overall linear estimate.
+The local weighted regression (loess model) assumes that the within very small windows of data the data is linear resp. parabolic. That allows for an overall non-linear context looking at the whole range of data. However this approach considers data points within a span and weights them differently. Looking at predictors like _movieId_ or _userId_ this approach would not work very well because the Ids have a rather categorical character and two movies or users with very close Ids have independent ratings.
 
 
 ## Conclusion
-To sum up the results of this report it was possible to train an algorithm and reach an _RMSE of _.
+To sum up the results of this report it was possible to train an algorithm and reach an RMSE of 
+```{r final result, echo=false } 
+tail(rmse_results$RMSE, 1)
+
+```
+.
 The best performance was reached by using Model _2.6_ with a regularized approach.
 
 
 The limitations of this report lie in the limited data used and in the approach chosen, with a limited amount of pre-chosen predictors. Secondly some of the methods couldn´t be used due to a limitation of computing power. 
-In this analysis we only use a fraction of the possible combinations of predictors and training models. Separate predictors with separate models depending on the distribution and for example using an ensemble of thos could also be an option to improve performance.  
+In this analysis we only use a fraction of the possible combinations of predictors and training models. Separate predictors with separate models depending on the distribution and for example using an ensemble of those could also be an option to improve performance.  
 Next steps to improve performance would be to use other predictors like director, actors, country of origin, languages available, production cost, movie length, amount of awards, and more...
 One could also analyze for trigger words within the title and check if there are correlations with ratings if the title contains words like "Love", "reloaded", "fight" or others.
 Another way would also be to increase training data size, or use neural networks to find new predictors using deep learning algorithms. In order to do so we would need to provide a broader data base.
