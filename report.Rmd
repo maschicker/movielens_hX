@@ -2,11 +2,16 @@
 title: "HarvardX - Data Science"
 author: "Marco Schicker"
 date: "2021"
-output: pdf_document
+output: 
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+
 ---
 
-``` {r setup, include=FALSE, eval=T, echo=F, message=F, warning=F}
-knitr::opts_chunk$set(echo = TRUE)
+``` {r setup, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, Message=FALSE)
 #######INSTALL PACKAGES#######
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
@@ -92,7 +97,7 @@ In general the steps performed to fulfill the task are:
 * training different models and comparing performance
 * validating the most promising model on the validation set
 
-In the end a Model was found with a RMSE of ``` {r final result, echo=false } final_model_rmse <- RMSE(validation$rating, final_predict)``` running on the validation data set. 
+In the end a Model was found with a RMSE of ``` {r final result } final_model_rmse <- RMSE(validation$rating, final_predict)``` running on the validation data set. 
 
 
 ## Methods & Analysis
@@ -115,21 +120,21 @@ In order to work with the data set it is analyzed and altered
 
 #### Overall analysis
 To get a first overview about the data the following table is created:
-```{r analysis 1, echo=false}
+```{r analysis 1, echo=FALSE}
 summary(edx)
 ```
-The dimansions of the data file are 
-```{r, echo=false} dim(edx)``` 
+The dimensions of the data file are 
+```{r, echo=FALSE} dim(edx)``` 
 The data classes are shown in the following table
-```{r classes, echo=true}
+```{r classes, echo=FALSE}
 sapply(edx, class)
 ```
-We can see that the data set edx consists of ```{r rows, echo=false} nrow(edx)``` rows and six columns with numerical and character variables. There are no NA-Values and on first sight plausible min and max values, so the data quality looks good. 
-```{r analysis 2, echo=false}
+We can see that the data set edx consists of ```{r rows} nrow(edx)``` rows and six columns with numerical and character variables. There are no NA-Values and on first sight plausible min and max values, so the data quality looks good. 
+```{r analysis 2, echo=TRUE }
 head(edx)
 ```
 
-The column "title" contains the title and the release year of the movie. The colums "timestamp" is formatted as an integer, showing seconds since 1970-01-01. The data will be mutated to include the new columns:
+The column "title" contains the title and the release year of the movie. The columns "timestamp" is formatted as an integer, showing seconds since 1970-01-01. The data will be mutated to include the new columns:
 * "rel_year" - the release year of the movie, derived from the title column
 * "ts_year" - year of the timestamp of the rating
 * "ts_month" - month of the timestamp of the rating
@@ -138,7 +143,7 @@ The column "title" contains the title and the release year of the movie. The col
 Since integer valus occupy only half space compared to numeric the columns with natural numbers will be converted to integer in order to reduce required data size for calculations later on.
 
 The new summary of edx looks like this:
-```{r sum_new, echo=false}
+```{r sum_new}
 # extract release year from title column to create a new predictor for edx and validation
 # extract year, month and day from timestamp
 # convert numeric to integer if possible to half data size (8b-->4b) ==> higher modeling speed
@@ -165,17 +170,17 @@ summary(edx)
 
 
 #### Find duplicate entries
-```{r duplicates, echo=false}
+```{r duplicates}
 #look for duplicate entries
 problems <- which(duplicated(edx))
 
 ```
 
 Duplicate entries could pose a problem for any algorithm so we need to check for them. 
-``` {r, echo=false} length(problems)``` duplicate entries could be found.
+``` {r} length(problems)``` duplicate entries could be found.
 
 #### Find predictors that are highly correlated and remove if necessary
-``` {r correlation, echo = FALSE}
+``` {r correlation}
 d <- data.frame(userId = edx$userId,
                 movieId = edx$movieId,
                 rating = edx$rating,
@@ -196,7 +201,7 @@ validation <- validation[,-c("timestamp")]
 
 #### Remove predictors with near zero variation
 Next we need to check if we have predictors in our data set that have no or very small variation. 
-```{r NZV, echo=false}
+```{r NZV}
 nzv <- nearZeroVar(edx, saveMetrics = TRUE)
 nzv[,3:4]
 ```
@@ -210,7 +215,7 @@ To get a better grip on distributions of the target variable and the predictors 
 ##### Histograms  
 
 
-```{r hist, echo = false}
+```{r hist}
 ##histogram rating overall
 edx %>% ggplot(aes(rating))+
   geom_histogram(binwidth = 0.5)+
@@ -266,7 +271,7 @@ the two histograms of _movieId_ and _userId_ both show a wide range of occurance
 
 To dive deeper into the data graphs are created that show the average, the median and the standard error over each predictor. In addition to this a smoothplot is added to get a first idea about fitting based on single predictors using LOESS as a fitting algorithm.
 
-```{r smoothplots, echo=false}
+```{r smoothplots}
 ##plot ratings over timestamp_year (median, avg, se & smoothline)
 
 edx %>% group_by(ts_year)%>%
@@ -398,7 +403,7 @@ We can see from the analyzed data that we have hardly any change of rating or st
 * ts_month
 * ts_day
 As we have seen in the histogram there is also hardly change in numbers, so these two variables will be dumped from the edx and validation data set.
-```{r drop day and month, echo=false}
+```{r drop day and month}
 ##Dropping non-important variables ts_month and ts_day
 edx <- edx[,1:7]
 validation <- validation[,1:7]
@@ -432,7 +437,7 @@ In order to find the best performing model we will use the predictors as describ
 
 #### Initialization of modelling
 The data set edx is split into a training set (90% of the data) and a test set (10% of the data). 
-```{r modelling data setup, echo=f}
+```{r modelling data setup}
 set.seed(1, sample.kind="Rounding")
 test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.1, list = FALSE)
 edx_train <- edx[-test_index,]
@@ -444,7 +449,7 @@ edx_test <- edx_test %>%
 
 ```
 Secondly the target function is defined. As we are aiming to minimize the rooted mean square error (RMSE) the function is defined as follows:
-```{r rmse}
+```{r rmse, echo=TRUE}
 #DEFINE RMSE-FUNCTION
 RMSE <- function(true_ratings, predicted_ratings){
   sqrt(mean((true_ratings - predicted_ratings)^2))
@@ -452,7 +457,7 @@ RMSE <- function(true_ratings, predicted_ratings){
 ```
 The last two intitialisation procedures include calculating the mean rating (as it is used for quite few of the model calculations) and setting up a dataframe to compare the results of the different models.
 
-```{r}
+```{r, echo=TRUE}
 #Calculate Mu (average)
 mu <- mean(edx_train$rating) 
 
@@ -495,7 +500,7 @@ Some of the models didn't run due to computing power constraints. Those models a
 #### Model 1 - Average
 The average is the starting model and is the basis that we always need to beat. 
 It results in a RMSE of 
-```{r M_avg, echo=false}
+```{r M_avg}
 ####MODEL 1 - AVERAGE####
 avg_rmse <- RMSE(edx_test$rating, mu)
 
@@ -515,7 +520,7 @@ In general the models always work by analyzing the difference between the avg ra
 ##### Linear models with one predictor
 
 The two most promising predictors are MovieId and UserId and are compared by running a model based on a single predictor.
-```{r M_lin1, echo=false}
+```{r M_lin1}
 ####MODEL 2.1.1 - LM with movieId####
 
 set.seed(1, sample.kind = "Rounding")
@@ -562,7 +567,7 @@ As we can see movieId has a slightly lower RMSE and is therefore the better pred
 
 In this group of predictors we follow the same approach but use two predictors. The predictor mix is always chosen in a way that either movieId or userId are the first one and will be paired with one of the remaining other three predictors.
 Recalling certain correlations it doesnot make sense to try out every possible combination as for example release year and movieId are highly correlated.
-```{r M_lin2, echo=false}
+```{r M_lin2}
 ####MODEL 2.2.1 - LM with movieId + userId####
 
 set.seed(1, sample.kind = "Rounding")
@@ -670,7 +675,7 @@ The results show that the model with the lowest RMSE is the combination of movie
 
 ##### Linear models with three predictors
 The two predictors movieId and userId are combined with the genre in the first model and with the release year in the second model.
-```{r M_lin3, echo=false}
+```{r M_lin3}
 ####MODEL 2.3.1 - LM with userId + movieId + genre
 
 tmp <- gc() #garbage collection to free memory
@@ -759,7 +764,7 @@ The results show that the best performing model is now the one with movieId, use
 
 ##### Linear models with four predictors
 The best performing model with three predictors is complemented with rel_year and ts_year and the final performance is shown in the following overview:
-```{r M_lin4, echo=false}
+```{r M_lin4}
 ####MODEL 2.4.1 - LM with movieId + userId + genre + rel_year
 
 tmp <- gc() #garbage collection to free memory
@@ -833,7 +838,7 @@ $\frac{1}{N}\sum_{u, i, g, ry}(y_{u, i, g, ry}-\mu-b_i-b_u-b_g-b_{ry})^2 + \lamb
 
 The following graph shows the lambda that minimizes the RMSE and the corresponding RMSE in the comparison table.
 
-```{r M_lin_reg, echo=false}
+```{r M_lin_reg}
 tmp <- gc()
 
 set.seed(1, sample.kind = "Rounding")
@@ -881,7 +886,7 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results %>% knitr::kable()
 ```
 
-As you can see from the graph the minimum RMSE is reached with a lambda of ```{r, echo=false} lambda```
+As you can see from the graph the minimum RMSE is reached with a lambda of ```{r} lambda```
 
 #### Model 3 - knn
  _"not able to run"_ 
@@ -889,7 +894,7 @@ As you can see from the graph the minimum RMSE is reached with a lambda of ```{r
 _"not able to run"_
 #### Model 5 - loess
 The local weighted regression (loess model) is being used on the two predictors _movieId_ and _userId_, takes a long time to run with results not much better compared to the overall rating average. 
-```{r M_loess, echo=false}
+```{r M_loess}
 ####MODEL 5 - LOESS#### 
 
 train_loess <- train(rating ~userId+movieId, 
@@ -911,7 +916,7 @@ _"not able to run"_
 #### Model 7 - GLM
 As a last model for comparison the generalized linear model is used. Due to computing power we use a model with only two predictors (_movieId_ and _userId_). As expected the results are not as good as the ones from a regularized linear model with four predictors.
 
-```{r M_glm, echo=false}
+```{r M_glm}
 ####MODEL 7 - GLM####
 
 train_glm <- train(rating ~userId+movieId, 
@@ -936,7 +941,7 @@ rmse_results %>% knitr::kable()
 Following the approach mentioned above we can see that we reach the best result by running a linear regularized model with the 4 predictors _movieId_, _userId_, _genres_, _rel_year_
 This model is validated on the validation data set. As lambda we use the evaluated value of 4.75. As there are very few rows that didn't show up in the training data the prediction function creates a few NA-values that can be identified in the summary. A check shows the titles of those few movies. In order to make the model work these prediction values are substituted with mu and the final RMSE is calculated.
 
-```{r results, echo=false }
+```{r results}
 #########VALIDATE BEST MODEL#########
 
 
@@ -990,7 +995,7 @@ The local weighted regression (loess model) assumes that the within very small w
 
 ## Conclusion
 To sum up the results of this report it was possible to train an algorithm and reach an RMSE of 
-```{r final result, echo=false } 
+```{r final result} 
 tail(rmse_results$RMSE, 1)
 
 ```
