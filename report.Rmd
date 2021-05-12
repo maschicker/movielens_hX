@@ -78,7 +78,7 @@ rm(dl, ratings, movies, test_index, temp, movielens, removed)
 
 
 
-## Executive summary
+# Executive summary
 
 The goal of this project is to predict movie ratings based on a set of predictors. The target is to create a model which predictions minimize the deviations compared with the true rating, i.e. a low root mean square deviation (RMSE).
 The means to do so are analyzing a data set provided and training a model to make predictions for a validation set of data. 
@@ -97,10 +97,10 @@ In general the steps performed to fulfill the task are:
 * training different models and comparing performance
 * validating the most promising model on the validation set
 
-In the end a Model was found with a RMSE of ``` {r final result } final_model_rmse <- RMSE(validation$rating, final_predict)``` running on the validation data set. 
+In the end a Model was found with a RMSE below 0.86490 running on the validation data set. 
 
 
-## Methods & Analysis
+# Methods & Analysis
 The process to train the models consists of the following basic steps:
 * data import
 * data exploration, cleaning and visualization
@@ -109,16 +109,16 @@ The process to train the models consists of the following basic steps:
 * training and comparing different models
 * validation of best model
 
-### data import
+## data import
 The data used to train the model is derived from the publicly available movielens database. According to provided code a data set "edx" and a dataset "validation" is automatically created. 
 The "edx"-data set is used to train a model, while the second data set "validation" is used to validate the chosen model. 
 
 
-### data exploration, cleaning and visualization
+## data exploration, cleaning and visualization
 
 In order to work with the data set it is analyzed and altered
 
-#### Overall analysis
+### Overall analysis
 To get a first overview about the data the following table is created:
 ```{r analysis 1, echo=FALSE}
 summary(edx)
@@ -169,7 +169,7 @@ summary(edx)
 ```
 
 
-#### Find duplicate entries
+### Find duplicate entries
 ```{r duplicates}
 #look for duplicate entries
 problems <- which(duplicated(edx))
@@ -179,7 +179,7 @@ problems <- which(duplicated(edx))
 Duplicate entries could pose a problem for any algorithm so we need to check for them. 
 ``` {r} length(problems)``` duplicate entries could be found.
 
-#### Find predictors that are highly correlated and remove if necessary
+### Find predictors that are highly correlated and remove if necessary
 ``` {r correlation}
 d <- data.frame(userId = edx$userId,
                 movieId = edx$movieId,
@@ -198,8 +198,7 @@ edx <- edx[,-c("timestamp")]
 validation <- validation[,-c("timestamp")]
 ```
 
-
-#### Remove predictors with near zero variation
+### Remove predictors with near zero variation
 Next we need to check if we have predictors in our data set that have no or very small variation. 
 ```{r NZV}
 nzv <- nearZeroVar(edx, saveMetrics = TRUE)
@@ -385,11 +384,11 @@ edx %>% group_by(userId)%>%
 
 
 
-### Insights gained
+## Insights gained
 
 As the graphs show there are big differences between the ratings depending on the different predictors. The standard error is comparable for all numeric variables around 1 and varies more widely when we look at genre as a predictor. That shows us that any of these predictors alone 
 
-#### timestamp_year
+### timestamp_year
 The average rating doesn't change very much in different days and can be estimated pretty well.We can see that 1995 has no calculated average and standard error. Further analysis shows that we have only 
 ```{r}
 ##deep dive ts_year because of non-conclusive data in 1995
@@ -397,7 +396,7 @@ length(which(edx$ts_year==1995))
 ```
 ratings from 1995 in the data set. The smoothplot shows that this causes the uncertainty to rise and also impacts the RMSE in 1996 negatively. 
 
-#### timestamp month and day
+### timestamp month and day
 
 We can see from the analyzed data that we have hardly any change of rating or standard error looking at the predictors
 * ts_month
@@ -409,19 +408,19 @@ edx <- edx[,1:7]
 validation <- validation[,1:7]
 ```
 
-#### release year of movie
+### release year of movie
 The data provides a very useful insight to the predictor. We can see that avg and standard error change significantly based on the release year of the movie. Further we notice a significant drop in avg and median rating after 1980. Compared with the information seen in the istogram we can see, that obviously movies with an early release date receive less ratings but on average better ratings. release year seems to be a very good predictor to differentiate ratings of movies. However, the smoothcurve shows that we have quite a few outliers which shows that we need additional predictors to reach the desired RMSE.
 
-#### Genres
+### Genres
 To get a better overview we limit the graph to genres with more than 1000 occurances. Looking at the results we can see that there are significant differences between different genres. Using genres as a predictor would enable us to account for quite some variation in the data set. As it is categorical data we don't see a smoothplot.
 
-#### MovieId
+### MovieId
 Analyzing  rating over MoviId we can see the strongest spread between avg and median ratings. We can see the full range between 0.5 and 5 in the median range. Using the movieId as a predictor should account for most of the variation. 
 
-#### UserId
+### UserId
 The userId is also showing a lot of variation. Similar to MOvieId as a predictor we can observe the full range of possible ratings. Next to MOvieId this should be the second predictor to start with.
 
-#### Concluding insights
+### Concluding insights
 To create the models we will use the five predictors
 1. movieId
 2. userId
@@ -431,11 +430,11 @@ To create the models we will use the five predictors
 
 
 
-### modeling approach
+## modeling approach
 
 In order to find the best performing model we will use the predictors as described in the prior chapter individually or in combination and apply different methods to train the models.
 
-#### Initialization of modelling
+### Initialization of modelling
 The data set edx is split into a training set (90% of the data) and a test set (10% of the data). 
 ```{r modelling data setup}
 set.seed(1, sample.kind="Rounding")
@@ -467,7 +466,7 @@ rmse_results <- data.frame(method = character(),
 ```
 
 
-#### List of prediction models
+### List of prediction models
 The models used are described by the following code: 
 
 Model 1 - Average
@@ -497,7 +496,7 @@ Model 7 - GLM
 
 Some of the models didn't run due to computing power constraints. Those models are marked as _"not able to run"_ and are not included in the comparison of best performing model. However, they are kept in the overview and code, ready to run for anybody with a more potent computer.
 
-#### Model 1 - Average
+### Model 1 - Average
 The average is the starting model and is the basis that we always need to beat. 
 It results in a RMSE of 
 ```{r M_avg}
@@ -513,11 +512,11 @@ rmse_results %>% knitr::kable()
 ```
 
 
-#### Model 2 - Linear models
+### Model 2 - Linear models
 The group of linear models is the biggest in this project and is divided in groups defined by the number of used predictors. The best performing model is finally optimized by using regularization. 
 In general the models always work by analyzing the difference between the avg rating of a certain predictor and the overall avg rating. This value is then used to calculate the prediction by adding it to the mean. 
 
-##### Linear models with one predictor
+#### Linear models with one predictor
 
 The two most promising predictors are MovieId and UserId and are compared by running a model based on a single predictor.
 ```{r M_lin1}
@@ -563,7 +562,7 @@ rmse_results %>% knitr::kable()
 ```
 As we can see movieId has a slightly lower RMSE and is therefore the better predictor.
 
-##### Linear models with two predictors
+#### Linear models with two predictors
 
 In this group of predictors we follow the same approach but use two predictors. The predictor mix is always chosen in a way that either movieId or userId are the first one and will be paired with one of the remaining other three predictors.
 Recalling certain correlations it doesnot make sense to try out every possible combination as for example release year and movieId are highly correlated.
@@ -673,7 +672,7 @@ rmse_results %>% knitr::kable()
 The results show that the model with the lowest RMSE is the combination of movieId and userId (2.2.1). This combination will also be the basis for all next models.
 
 
-##### Linear models with three predictors
+#### Linear models with three predictors
 The two predictors movieId and userId are combined with the genre in the first model and with the release year in the second model.
 ```{r M_lin3}
 ####MODEL 2.3.1 - LM with userId + movieId + genre
@@ -762,7 +761,7 @@ rmse_results %>% knitr::kable()
 The results show that the best performing model is now the one with movieId, userId and genre as predictors (2.3.1). It seems that genre accounts for more separate uncertainty compared to release year. The reason could be that release year and movieId are correlated to some degree and account for the same uncertainty.
 
 
-##### Linear models with four predictors
+#### Linear models with four predictors
 The best performing model with three predictors is complemented with rel_year and ts_year and the final performance is shown in the following overview:
 ```{r M_lin4}
 ####MODEL 2.4.1 - LM with movieId + userId + genre + rel_year
@@ -828,10 +827,10 @@ rmse_results %>% knitr::kable()
 ```
 As we see the best performing model so far is 2.4.1 - using movieId + userId + genre + rel_year as predictors. This model will be regularized to account for the different weight of adjustments based on the number of ratings.
 
-##### Linear models with five predictors
+#### Linear models with five predictors
 _"not able to run"_
 
-##### Regularized linear model
+#### Regularized linear model
 In order to regularize the impact of the four predictors we will need to penalize predictor values with very few occurrences. In order to do so we define a value lambda that leads to an overall minimized RMSE. That means minimizing the following formula:
 
 $\frac{1}{N}\sum_{u, i, g, ry}(y_{u, i, g, ry}-\mu-b_i-b_u-b_g-b_{ry})^2 + \lambda(\sum_i b_{i}^2 + \sum_u b_{u}^2 + \sum_g b_{g}^2 + \sum_{ry} b_{ry}^2)$
@@ -888,11 +887,11 @@ rmse_results %>% knitr::kable()
 
 As you can see from the graph the minimum RMSE is reached with a lambda of ```{r} lambda```
 
-#### Model 3 - knn
+### Model 3 - knn
  _"not able to run"_ 
-#### Model 4 - decision tree
+### Model 4 - decision tree
 _"not able to run"_
-#### Model 5 - loess
+### Model 5 - loess
 The local weighted regression (loess model) is being used on the two predictors _movieId_ and _userId_, takes a long time to run with results not much better compared to the overall rating average. 
 ```{r M_loess}
 ####MODEL 5 - LOESS#### 
@@ -911,9 +910,9 @@ rmse_results %>% knitr::kable()
 
 ```
 
-#### Model 6 - random forest
+### Model 6 - random forest
 _"not able to run"_
-#### Model 7 - GLM
+### Model 7 - GLM
 As a last model for comparison the generalized linear model is used. Due to computing power we use a model with only two predictors (_movieId_ and _userId_). As expected the results are not as good as the ones from a regularized linear model with four predictors.
 
 ```{r M_glm}
@@ -923,7 +922,7 @@ train_glm <- train(rating ~userId+movieId,
                    method = "glm", 
                    data = edx_train)
 train_glm$bestTune
-model7_predict <- predict(train_glm, edx_test, type="response")
+model7_predict <- predict(train_glm, edx_test)
 
 
 model_7_rmse <- RMSE(edx_test$rating, model7_predict)
@@ -937,7 +936,7 @@ rmse_results %>% knitr::kable()
 
 
 
-## Results
+# Results
 Following the approach mentioned above we can see that we reach the best result by running a linear regularized model with the 4 predictors _movieId_, _userId_, _genres_, _rel_year_
 This model is validated on the validation data set. As lambda we use the evaluated value of 4.75. As there are very few rows that didn't show up in the training data the prediction function creates a few NA-values that can be identified in the summary. A check shows the titles of those few movies. In order to make the model work these prediction values are substituted with mu and the final RMSE is calculated.
 
@@ -993,7 +992,7 @@ GLM performs lower because it assumes a linear context for all predictors.
 The local weighted regression (loess model) assumes that the within very small windows of data the data is linear resp. parabolic. That allows for an overall non-linear context looking at the whole range of data. However this approach considers data points within a span and weights them differently. Looking at predictors like _movieId_ or _userId_ this approach would not work very well because the Ids have a rather categorical character and two movies or users with very close Ids have independent ratings.
 
 
-## Conclusion
+# Conclusion
 To sum up the results of this report it was possible to train an algorithm and reach an RMSE of 
 ```{r final result} 
 tail(rmse_results$RMSE, 1)
