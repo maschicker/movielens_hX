@@ -262,27 +262,25 @@ edx %>% group_by(genres)%>%
 ##plot ratings over movieId (median, avg)
 edx %>% group_by(movieId)%>%
   summarize(
-    n=n(),
     avg=mean(rating),
     med=median(rating)
   )%>%
   ggplot(aes(x=movieId, y=avg, col="avg"))+
   geom_point()+
-  geom_point(aes(y=med, col="median"))+
+  geom_point(aes(x=movieId, y=med, col="median"))+
   labs(title="MovieId", y="Rating", x="Movie Id")+
   ylim(0,5)
 
 ##plot ratings over userId (median, avg)
 edx %>% group_by(userId)%>%
   summarize(
-    n=n(),
     avg=mean(rating),
     med=median(rating)
   )%>%
-  ggplot(aes(x=userId, y=avg, col="avg"))+
-  geom_point()+
-  geom_point(aes(y=med, col="median"))+
-  labs(title="UserId", y="Rating", x="User Id")+
+  ggplot()+
+  geom_point(aes(x=userId, y=avg, col="avg"))+
+  geom_point(aes(x=userId, y=med, col="median"))+
+  labs(title="UserId", y="Rating", x="UserId")+
   ylim(0,5)
 
 
@@ -676,7 +674,7 @@ lambda <- lambdas[which.min(rmses)]
 lambda
 
 rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="Regularized 2.4.1 - movie+user+genre+rel_year",  
+                          data_frame(method="2.4.1(Regularized) - movie+user+genre+rel_year",  
                                      RMSE = min(rmses)))
 rmse_results %>% knitr::kable()
 
@@ -794,7 +792,7 @@ model7_predict <- predict(train_glm, edx_test, type="response")
 model_7_rmse <- RMSE(edx_test$rating, model7_predict)
 
 rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="Model 7 - GLM",
+                          data_frame(method="7 - GLM",
                                      RMSE = model_7_rmse ))
 rmse_results %>% knitr::kable()
 
@@ -838,7 +836,7 @@ final_predict <- replace(final_predict, is.na(final_predict), mu) #exchange NA´
   
   final_model_rmse <- RMSE(validation$rating, final_predict)
 rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="VALIDATION - Regularized 2.4.1 - movie+user+genre+rel_year",  
+                          data_frame(method="VALIDATION - 2.4.1 (Regularized) - movie+user+genre+rel_year",  
                                      RMSE = final_model_rmse))
 rmse_results %>% knitr::kable()
 

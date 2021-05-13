@@ -5,7 +5,7 @@ date: "2021"
 output: 
   pdf_document:
     toc: true
-    toc_depth: 3
+    toc_depth: 2
     number_sections: true
 
 ---
@@ -139,13 +139,14 @@ sapply(edx, class)
 ```
 We can see that the data set "edx" consists of 9000055 rows and six columns with numerical and character variables. There are no NA-Values and on first sight plausible min and max values, so the data quality looks good. 
 
-To get a first inside into the content we take a look at the first rows to see actually real data.
+To get a first inside into the content we take a look at the first rows to see actual real data.
 
 ```{r analysis 2 }
 head(edx)
 ```
 
-The column "title" contains the title and the release year of the movie. The columns "timestamp" is formatted as an integer, showing seconds since 1970-01-01. The data will be mutated to include the new columns:
+The column "title" contains the title and the release year of the movie. The columns "timestamp" is formatted as an integer, showing seconds since 1970-01-01. The data will be mutated to include the new columns:  
+
 * "rel_year" - the release year of the movie, derived from the title column
 * "ts_year" - year of the timestamp of the rating
 * "ts_month" - month of the timestamp of the rating
@@ -223,14 +224,15 @@ nzv[,3:4]
 As the analysis shows there is no reason to exclude any predictors from the list.
 
 
-#### Average and distribution
+#### Average and distribution  
 
 A first glance at the data shows the distribution of ratings with an overall average rating of `r mean(edx$rating)`.
 To get a better grip on distributions of the target variable and the predictors we will have a look at histograms as well as on rating distributions for each predictor individually.
 
 ##### Histograms  
 
-The following graphs show number of occurrences of ratings based on various variables.
+The following graphs show number of occurrences of ratings based on various variables.  
+
 ```{r hist}
 ##histogram rating overall
 edx %>% ggplot(aes(rating))+
@@ -301,10 +303,13 @@ edx %>% group_by(ts_year)%>%
   ggplot(aes(x=ts_year, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  geom_errorbar(aes(alpha=0.3))+
+  geom_errorbar(aes(alpha=0.3), show.legend = FALSE)+
   geom_smooth()+
   labs(title="Timestamp Year", y="Rating")+
   ylim(0,5)
+
+##deep dive ts_year because of non-conclusive data in 1995
+length(which(edx$ts_year==1995))
 
 ##plot ratings over timestamp_month (median, avg, se & smoothline)
 edx %>% group_by(ts_month)%>%
@@ -317,7 +322,7 @@ edx %>% group_by(ts_month)%>%
   ggplot(aes(x=ts_month, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  geom_errorbar(aes(alpha=0.3))+
+  geom_errorbar(aes(alpha=0.3), show.legend = FALSE)+
   geom_smooth()+
   labs(title="Timestamp Month", y="Rating")+
   ylim(0,5)
@@ -333,10 +338,15 @@ edx %>% group_by(ts_day)%>%
   ggplot(aes(x=ts_day, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  geom_errorbar(aes(alpha=0.3))+
+  geom_errorbar(aes(alpha=0.3), show.legend = FALSE)+
   geom_smooth()+
   labs(title="Timestamp Day", y="Rating")+
   ylim(0,5)
+
+##Dropping non-differentiating variables ts_month and ts_day
+edx <- edx[,1:7]
+validation <- validation[,1:7]
+
 
 ##plot ratings over release year of the movie (median, avg, se & smoothline)
 edx %>% group_by(rel_year)%>%
@@ -349,7 +359,7 @@ edx %>% group_by(rel_year)%>%
   ggplot(aes(x=rel_year, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  geom_errorbar(aes(alpha=0.3))+
+  geom_errorbar(aes(alpha=0.3), show.legend = FALSE)+
   geom_smooth()+
   labs(title="Release Year", y="Rating")+
   ylim(0,5)
@@ -367,34 +377,32 @@ edx %>% group_by(genres)%>%
   ggplot(aes(x=genres, y=avg, ymin=avg-se, ymax=avg+se, col="avg"))+
   geom_point()+
   geom_point(aes(y=med, col="median"))+
-  geom_errorbar(aes(alpha=0.3))+
+  geom_errorbar(aes(alpha=0.3), show.legend = FALSE)+
   labs(title="Genres > 1000 occurances", y="Rating", x="")+
   ylim(0,5)
 
 ##plot ratings over movieId (median, avg)
 edx %>% group_by(movieId)%>%
   summarize(
-    n=n(),
     avg=mean(rating),
     med=median(rating)
   )%>%
   ggplot(aes(x=movieId, y=avg, col="avg"))+
   geom_point()+
-  geom_point(aes(y=med, col="median"))+
+  geom_point(aes(x=movieId, y=med, col="median"))+
   labs(title="MovieId", y="Rating", x="Movie Id")+
   ylim(0,5)
 
 ##plot ratings over userId (median, avg)
 edx %>% group_by(userId)%>%
   summarize(
-    n=n(),
     avg=mean(rating),
     med=median(rating)
   )%>%
-  ggplot(aes(x=userId, y=avg, col="avg"))+
-  geom_point()+
-  geom_point(aes(y=med, col="median"))+
-  labs(title="UserId", y="Rating", x="User Id")+
+  ggplot()+
+  geom_point(aes(x=userId, y=avg, col="avg"))+
+  geom_point(aes(x=userId, y=med, col="median"))+
+  labs(title="UserId", y="Rating", x="UserId")+
   ylim(0,5)
 
 
@@ -413,9 +421,11 @@ The average rating doesn't change very much in different days and can be estimat
 
 ### timestamp month and day  
   
-We can see from the analyzed data that we have hardly any change of rating or standard error looking at the predictors
+We can see from the analyzed data that we have hardly any change of rating or standard error looking at the predictors  
+
 - ts_month
-- ts_day
+- ts_day  
+
 As we have seen in the histogram there is also hardly change in numbers, so these two variables will be dumped from the edx and validation data set.
 ```{r drop day and month}
 ##Dropping non-important variables ts_month and ts_day
@@ -429,15 +439,15 @@ The data provides a very useful insight to the predictor. We can see that avg an
 
 ### Genres  
 
-To get a better overview we limit the graph to genres with more than 1000 occurances. Looking at the results we can see that there are significant differences between different genres. Using genres as a predictor would enable us to account for quite some variation in the data set. As it is categorical data we don't see a smoothplot.
+To get a better overview we limit the graph to genres with more than 1000 occurrences. Looking at the results we can see that there are significant differences between different genres. Using genres as a predictor would enable us to account for quite some variation in the data set. As it is categorical data we don't see a smoothplot.
 
 ### MovieId  
 
-Analyzing  rating over MoviId we can see the strongest spread between avg and median ratings. We can see the full range between 0.5 and 5 in the median range. Using the movieId as a predictor should account for most of the variation. 
+Analyzing  rating over movieId we can see the strongest spread between avg and median ratings. We can see the full range between 0.5 and 5 in the median range. The median values in between (e.g. 4.75) are created when there is an even number of ratings per movieId and the two middle values are different. The median() function returns the avg of those two values. Using the movieId as a predictor should account for most of the variation. 
 
 ### UserId  
 
-The userId is also showing a lot of variation. Similar to MOvieId as a predictor we can observe the full range of possible ratings. Next to MovieId this should be the second predictor to start with.
+The userId is also showing a lot of variation. Similar to MovieId as a predictor we can observe the full range of possible ratings. Next to MovieId this should be the second predictor to start with.
 
 ### Concluding insights  
 
@@ -911,7 +921,7 @@ qplot(lambdas, rmses)
 lambda <- lambdas[which.min(rmses)]
 
 rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="Regularized 2.4.1 - movie+user+genre+rel_year",  
+                          data_frame(method="2.4.1 (Regularized) - movie+user+genre+rel_year",  
                                      RMSE = min(rmses)))
 rmse_results %>% knitr::kable()
 ```
@@ -967,7 +977,7 @@ model7_predict <- predict(train_glm, edx_test)
 model_7_rmse <- RMSE(edx_test$rating, model7_predict)
 
 rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="Model 7 - GLM",
+                          data_frame(method="7 - GLM",
                                      RMSE = model_7_rmse ))
 rmse_results %>% knitr::kable()
 ```
@@ -1024,7 +1034,7 @@ final_predict <- replace(final_predict, is.na(final_predict), mu) #exchange NA´
   
   final_model_rmse <- RMSE(validation$rating, final_predict)
 rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="VALIDATION - Regularized 2.4.1 - movie+user+genre+rel_year",  
+                          data_frame(method="VALIDATION - 2.4.1 (Regularized) - movie+user+genre+rel_year",  
                                      RMSE = final_model_rmse))
 rmse_results %>% knitr::kable()
 
