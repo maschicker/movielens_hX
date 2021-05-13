@@ -680,68 +680,68 @@ rmse_results %>% knitr::kable()
 
 ####MODEL 3.1 - knn#### 
 #EXTREMELY LONG RUNTIME ==> 2 days...not working
-set.seed(1, sample.kind = "Rounding")
-train_knn <- train(rating ~ userId+movieId+ts_year+rel_year, method = "knn", 
-                   data = edx_train,
-                   tuneGrid = data.frame(k = seq(9, 51, 3))
-)
-ggplot(train_knn, highlight = TRUE)
-train_knn$bestTune
-train_knn$finalModel
-min(train_knn$results$RMSE)
-model3.1_predict <- predict(train_knn, edx_test, type = "raw")
-model_3.1_rmse <- RMSE(edx_test$rating, model3.1_predict)
-
-rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="3.1 - knn",
-                                     RMSE = model_3.1_rmse))
-
-rmse_results %>% knitr::kable()
+#set.seed(1, sample.kind = "Rounding")
+#train_knn <- train(rating ~ userId+movieId+ts_year+rel_year, method = "knn", 
+#                   data = edx_train,
+#                   tuneGrid = data.frame(k = seq(9, 51, 3))
+#)
+#ggplot(train_knn, highlight = TRUE)
+#train_knn$bestTune
+#train_knn$finalModel
+#min(train_knn$results$RMSE)
+#model3.1_predict <- predict(train_knn, edx_test, type = "raw")
+#model_3.1_rmse <- RMSE(edx_test$rating, model3.1_predict)
+#
+#rmse_results <- bind_rows(rmse_results,
+#                          data_frame(method="3.1 - knn",
+#                                     RMSE = model_3.1_rmse))
+#
+#rmse_results %>% knitr::kable()
 
 
 ####MODEL 3.2 - knn-cross-validation#### 
 #EXTREMELY LONG RUNTIME ==> 2 days...not working
-
-set.seed(1, sample.kind = "Rounding")
-
-control <- trainControl(method = "cv", number = 2, p = .9)
-train_knn_cv <- train(rating ~ userId+movieId+rel_year, method = "knn", 
-                      data = edx_train,
-                      tuneGrid = data.frame(k = seq(3,51,3)),
-                      trControl = control)
-ggplot(train_knn_cv, highlight = TRUE)
-
-train_knn$results %>% 
-  ggplot(aes(x = k, y = RMSE)) +
-  geom_line() +
-  geom_point()
-
-model3.2_predict <- predict(train_knn_cv, edx_test, type = "raw")
-model_3.2_rmse <- RMSE(edx_test$rating, model3.2_predict)
-
-rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="3.2 - knn_CV",
-                                     RMSE = model_3.2_rmse))
+#
+#set.seed(1, sample.kind = "Rounding")
+#
+#control <- trainControl(method = "cv", number = 2, p = .9)
+#train_knn_cv <- train(rating ~ userId+movieId+rel_year, method = "knn", 
+#                      data = edx_train,
+#                      tuneGrid = data.frame(k = seq(3,51,3)),
+#                      trControl = control)
+#ggplot(train_knn_cv, highlight = TRUE)
+#
+#train_knn$results %>% 
+#  ggplot(aes(x = k, y = RMSE)) +
+#  geom_line() +
+#  geom_point()
+#
+#model3.2_predict <- predict(train_knn_cv, edx_test, type = "raw")
+#model_3.2_rmse <- RMSE(edx_test$rating, model3.2_predict)
+#
+#rmse_results <- bind_rows(rmse_results,
+#                          data_frame(method="3.2 - knn_CV",
+#                                     RMSE = model_3.2_rmse))
 
 
 ####MODEL 4 - DT ####
 # NOT WORKING - lack of memory
-set.seed(1, sample.kind = "Rounding")
-train_dt <- train(rating ~userId+movieId+rel_year+ts_year+genres, 
-                  method = "rpart", 
-                  #tuneGrid = data.frame(cp = seq(0, 0.05, 0.002)),
-                  metric="RMSE",
-                  data = edx_train)
-train_dt$bestTune
-model4_predict <- predict(train_dt, edx_test)
-
-
-
-model_4_rmse <- RMSE(edx_test$rating, model4_predict)
-
-rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="4 - Decision tree",
-                                     RMSE = model_4_rmse ))
+#set.seed(1, sample.kind = "Rounding")
+#train_dt <- train(rating ~userId+movieId+rel_year+ts_year+genres, 
+#                  method = "rpart", 
+#                  #tuneGrid = data.frame(cp = seq(0, 0.05, 0.002)),
+#                  metric="RMSE",
+#                  data = edx_train)
+#train_dt$bestTune
+#model4_predict <- predict(train_dt, edx_test)
+#
+#
+#
+#model_4_rmse <- RMSE(edx_test$rating, model4_predict)
+#
+#rmse_results <- bind_rows(rmse_results,
+#                          data_frame(method="4 - Decision tree",
+#                                     RMSE = model_4_rmse ))
 
 
 
@@ -762,21 +762,21 @@ rmse_results %>% knitr::kable()
 
 ####MODEL 6 - Random Forest####
 ##NOT WORKING - Lack of memory
-train_rf <- train(rating ~userId+movieId+rel_year+ts_year+genres, 
-                  method = "rf", 
-                 # tuneGrid = data.frame(mtry = seq(1:7)),
-                  ntree = 5,
-                  data = edx_train)
-train_rf$bestTune
-model6_predict <- predict(train_rf, edx_test)
-
-
-model_6_rmse <- RMSE(edx_test$rating, model6_predict)
-
-rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="6 - random forest",
-                                     RMSE = model_6_rmse ))
-rmse_results %>% knitr::kable()
+#train_rf <- train(rating ~userId+movieId+rel_year+ts_year+genres, 
+#                  method = "rf", 
+#                 # tuneGrid = data.frame(mtry = seq(1:7)),
+#                  ntree = 5,
+#                  data = edx_train)
+#train_rf$bestTune
+#model6_predict <- predict(train_rf, edx_test)
+#
+#
+#model_6_rmse <- RMSE(edx_test$rating, model6_predict)
+#
+#rmse_results <- bind_rows(rmse_results,
+#                          data_frame(method="6 - random forest",
+#                                     RMSE = model_6_rmse ))
+#rmse_results %>% knitr::kable()
 
 
 
