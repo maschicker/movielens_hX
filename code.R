@@ -693,7 +693,7 @@ model3.1_predict <- predict(train_knn, edx_test, type = "raw")
 model_3.1_rmse <- RMSE(edx_test$rating, model3.1_predict)
 
 rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="knn",
+                          data_frame(method="3.1 - knn",
                                      RMSE = model_3.1_rmse))
 
 rmse_results %>% knitr::kable()
@@ -720,7 +720,7 @@ model3.2_predict <- predict(train_knn_cv, edx_test, type = "raw")
 model_3.2_rmse <- RMSE(edx_test$rating, model3.2_predict)
 
 rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="knn_CV",
+                          data_frame(method="3.2 - knn_CV",
                                      RMSE = model_3.2_rmse))
 
 
@@ -740,7 +740,7 @@ model4_predict <- predict(train_dt, edx_test)
 model_4_rmse <- RMSE(edx_test$rating, model4_predict)
 
 rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="Decision tree",
+                          data_frame(method="4 - Decision tree",
                                      RMSE = model_4_rmse ))
 
 
@@ -774,7 +774,7 @@ model6_predict <- predict(train_rf, edx_test)
 model_6_rmse <- RMSE(edx_test$rating, model6_predict)
 
 rmse_results <- bind_rows(rmse_results,
-                          data_frame(method="random forest",
+                          data_frame(method="6 - random forest",
                                      RMSE = model_6_rmse ))
 rmse_results %>% knitr::kable()
 
